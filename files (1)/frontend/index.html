@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Code Completion</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 12px 20px;
+    background: #252526;
+    border-bottom: 1px solid #333;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 { font-size: 14px; margin: 0; font-weight: 500; }
+  .status {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #333;
+  }
+  .status.ok { background: #16825d; }
+  .status.err { background: #a1260d; }
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1px;
+    background: #333;
+    overflow: hidden;
+  }
+  .editor-pane {
+    position: relative;
+    background: #1e1e1e;
+    overflow: hidden;
+  }
+  .editor-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  .ghost-layer, textarea {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 16px;
+    font-family: "SF Mono", "Menlo", "Monaco", monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border: 0;
+    background: transparent;
+    overflow: auto;
+  }
+  .ghost-layer {
+    color: transparent;
+    pointer-events: none;
+    user-select: none;
+  }
+  .ghost-suggestion {
+    color: #6b6b6b;
+    font-style: italic;
+  }
+  textarea {
+    color: #d4d4d4;
+    caret-color: #d4d4d4;
+    resize: none;
+    outline: none;
+  }
+  .side-pane {
+    background: #252526;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow: auto;
+  }
+  .meter {
+    height: 6px;
+    background: #333;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .meter-fill {
+    height: 100%;
+    width: 0%;
+    background: #6b6b6b;
+    transition: width 200ms, background 200ms;
+  }
+  .meter-fill.inline { background: #16825d; }
+  .meter-fill.collapsed { background: #b58900; }
+  .meter-fill.hidden { background: #555; }
+  .label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .mode-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #333;
+    text-transform: uppercase;
+  }
+  .mode-badge.inline { background: #16825d; color: #fff; }
+  .mode-badge.collapsed { background: #b58900; color: #000; }
+  .mode-badge.hidden { background: #555; color: #aaa; }
+  .suggestion-box {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 12px;
+    font-family: "SF Mono", "Menlo", "Monaco", monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: #d4d4d4;
+    min-height: 60px;
+    margin-top: 6px;
+  }
+  .suggestion-box.empty {
+    color: #555;
+    font-style: italic;
+    font-family: inherit;
+    font-size: 12px;
+  }
+  button {
+    padding: 4px 10px;
+    background: #0e639c;
+    color: #fff;
+    border: 0;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  button:hover { background: #1177bb; }
+  button:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .hint {
+    font-size: 11px;
+    color: #666;
+    line-height: 1.6;
+  }
+  kbd {
+    background: #333;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: inherit;
+    font-size: 10px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI Code Completion</h1>
+  <span class="status" id="status">connecting…</span>
+</header>
+<main>
+  <div class="editor-pane">
+    <div class="editor-wrap">
+      <div class="ghost-layer" id="ghost"><span id="ghost-prefix"></span><span class="ghost-suggestion" id="ghost-suggestion"></span></div>
+      <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Start typing Python here…&#10;e.g.  def sort_list(arr):&#10;          "></textarea>
+    </div>
+  </div>
+  <aside class="side-pane">
+    <div>
+      <div class="label-row">
+        <span>Confidence</span>
+        <span id="confidence-num">—</span>
+      </div>
+      <div class="meter"><div class="meter-fill" id="meter-fill"></div></div>
+    </div>
+    <div>
+      <div class="label-row">
+        <span>UI Mode</span>
+        <span class="mode-badge" id="mode-badge">—</span>
+      </div>
+    </div>
+    <div>
+      <div class="label-row">
+        <span>Suggestion</span>
+        <button id="accept-btn" disabled>Accept</button>
+      </div>
+      <div class="suggestion-box empty" id="suggestion-box">No suggestion yet.</div>
+    </div>
+    <div class="hint">
+      <kbd>Tab</kbd> accept &nbsp;·&nbsp; <kbd>Esc</kbd> dismiss<br><br>
+      Inline ghost text appears when confidence ≥ 0.80.
+      Mid-confidence suggestions show only in this panel.
+      Low-confidence suggestions are suppressed.
+    </div>
+  </aside>
+</main>
+
+<script>
+const API_BASE = "http://localhost:8000";
+
+const editor          = document.getElementById("editor");
+const ghostLayer      = document.getElementById("ghost");
+const ghostPrefix     = document.getElementById("ghost-prefix");
+const ghostSuggestion = document.getElementById("ghost-suggestion");
+const statusEl        = document.getElementById("status");
+const confidenceNum   = document.getElementById("confidence-num");
+const meterFill       = document.getElementById("meter-fill");
+const modeBadge       = document.getElementById("mode-badge");
+const suggestionBox   = document.getElementById("suggestion-box");
+const acceptBtn       = document.getElementById("accept-btn");
+
+let currentSuggestion = null;
+let debounceTimer = null;
+let inflight = null;
+
+// ── Health check (poll until model loaded) ────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API_BASE}/health`);
+    const j = await r.json();
+    if (j.model_loaded) {
+      statusEl.textContent = "model loaded";
+      statusEl.className = "status ok";
+    } else {
+      statusEl.textContent = "model loading…";
+      statusEl.className = "status";
+      setTimeout(checkHealth, 2000);
+    }
+  } catch {
+    statusEl.textContent = "backend unreachable";
+    statusEl.className = "status err";
+    setTimeout(checkHealth, 3000);
+  }
+}
+checkHealth();
+
+// ── Keep ghost layer scroll in sync with textarea ─────────────
+editor.addEventListener("scroll", () => {
+  ghostLayer.scrollTop = editor.scrollTop;
+  ghostLayer.scrollLeft = editor.scrollLeft;
+});
+
+// ── Call backend ──────────────────────────────────────────────
+async function requestCompletion(prefix) {
+  if (inflight) inflight.abort();
+  const ctrl = new AbortController();
+  inflight = ctrl;
+  try {
+    const r = await fetch(`${API_BASE}/api/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix, max_new_tokens: 64 }),
+      signal: ctrl.signal,
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } finally {
+    if (inflight === ctrl) inflight = null;
+  }
+}
+
+// ── Render the three UI tiers ─────────────────────────────────
+function renderSuggestion(prefix, s) {
+  currentSuggestion = s;
+
+  if (!s || !s.completion) { clearSuggestion(); return; }
+
+  const { completion, confidence, ui_mode } = s;
+
+  confidenceNum.textContent = confidence.toFixed(3);
+  meterFill.style.width = `${Math.min(confidence * 100, 100)}%`;
+  meterFill.className = `meter-fill ${ui_mode}`;
+  modeBadge.textContent = ui_mode;
+  modeBadge.className = `mode-badge ${ui_mode}`;
+
+  if (ui_mode === "hidden") {
+    suggestionBox.textContent = "Suppressed (confidence too low).";
+    suggestionBox.className = "suggestion-box empty";
+    ghostPrefix.textContent = "";
+    ghostSuggestion.textContent = "";
+    acceptBtn.disabled = true;
+    return;
+  }
+
+  suggestionBox.textContent = completion;
+  suggestionBox.className = "suggestion-box";
+  acceptBtn.disabled = false;
+
+  if (ui_mode === "inline") {
+    ghostPrefix.textContent = prefix;
+    ghostSuggestion.textContent = completion;
+  } else {
+    ghostPrefix.textContent = "";
+    ghostSuggestion.textContent = "";
+  }
+}
+
+function clearSuggestion() {
+  currentSuggestion = null;
+  ghostPrefix.textContent = "";
+  ghostSuggestion.textContent = "";
+  confidenceNum.textContent = "—";
+  meterFill.style.width = "0%";
+  meterFill.className = "meter-fill";
+  modeBadge.textContent = "—";
+  modeBadge.className = "mode-badge";
+  suggestionBox.textContent = "No suggestion yet.";
+  suggestionBox.className = "suggestion-box empty";
+  acceptBtn.disabled = true;
+}
+
+// ── Debounced typing → completion ─────────────────────────────
+editor.addEventListener("input", () => {
+  clearSuggestion();
+  clearTimeout(debounceTimer);
+  const prefix = editor.value;
+  if (!prefix.trim()) return;
+  debounceTimer = setTimeout(async () => {
+    try {
+      const result = await requestCompletion(prefix);
+      if (editor.value === prefix) renderSuggestion(prefix, result);
+    } catch (e) {
+      if (e.name !== "AbortError") console.error(e);
+    }
+  }, 400);
+});
+
+// ── Tab to accept, Esc to dismiss ─────────────────────────────
+editor.addEventListener("keydown", (e) => {
+  if (e.key === "Tab" && currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
+    e.preventDefault();
+    insertAtCursor(currentSuggestion.completion);
+    clearSuggestion();
+  } else if (e.key === "Escape") {
+    clearSuggestion();
+  }
+});
+
+acceptBtn.addEventListener("click", () => {
+  if (currentSuggestion) {
+    insertAtCursor(currentSuggestion.completion);
+    clearSuggestion();
+    editor.focus();
+  }
+});
+
+function insertAtCursor(text) {
+  const start = editor.selectionStart;
+  const end = editor.selectionEnd;
+  editor.value = editor.value.slice(0, start) + text + editor.value.slice(end);
+  const pos = start + text.length;
+  editor.setSelectionRange(pos, pos);
+}
+</script>
+</body>
+</html>
