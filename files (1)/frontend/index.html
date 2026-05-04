@@ -8,7 +8,6 @@
   :root {
     --bg:           #1c1c1e;
     --bg-sidebar:   #1f1f21;
-    --bg-gutter:    #1a1a1c;
     --card:         #2c2c2e;
     --separator:    rgba(255,255,255,0.08);
     --text-1:       rgba(255,255,255,0.92);
@@ -22,15 +21,15 @@
     --red:          #ff453a;
     --gray:         #8e8e93;
 
-    /* Editor metrics — keep ghost layer + gutter + highlight layer aligned */
+    /* Editor metrics — must match Monaco settings (fontSize, lineHeight) */
     --code-font:    "SF Mono", ui-monospace, "Menlo", "Monaco", monospace;
-    --code-size:    14px;
-    --code-line:    1.55;
-    --pad-y:        24px;
-    --pad-x:        28px;
 
     /* Side panel width (resizable) */
     --side-width:   340px;
+
+    /* Eased motion */
+    --ease-spring:  cubic-bezier(0.34, 1.45, 0.64, 1);
+    --ease-out:     cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   * { box-sizing: border-box; }
@@ -68,7 +67,7 @@
   }
   .right { margin-left: auto; display: flex; gap: 8px; }
 
-  /* ── Status pill (with colored dot) ───────────────────────── */
+  /* ── Status pill ──────────────────────────────────────────── */
   .pill {
     display: inline-flex;
     align-items: center;
@@ -79,12 +78,14 @@
     border-radius: 999px;
     background: rgba(255,255,255,0.08);
     color: var(--text-2);
+    transition: color 200ms, background 200ms;
   }
   .pill .dot {
     width: 7px; height: 7px;
     border-radius: 50%;
     background: var(--gray);
     flex-shrink: 0;
+    transition: background 200ms;
   }
   .pill.ok    { color: var(--green);  background: rgba(48,209,88,0.14); }
   .pill.ok    .dot { background: var(--green); }
@@ -110,10 +111,10 @@
     border-radius: 7px;
     background: var(--accent);
     color: #fff;
-    transition: background 120ms, transform 80ms, opacity 120ms;
+    transition: background 120ms, transform 80ms var(--ease-spring), opacity 120ms;
   }
   button:hover  { background: var(--accent-hover); }
-  button:active { transform: scale(0.97); }
+  button:active { transform: scale(0.94); }
   button:disabled {
     background: rgba(255,255,255,0.06);
     color: var(--text-3);
@@ -135,6 +136,7 @@
     line-height: 1;
   }
   button.icon:hover { background: rgba(255,255,255,0.16); }
+  button.icon:active { transform: scale(0.92) rotate(-12deg); }
 
   /* ── Layout ───────────────────────────────────────────────── */
   main {
@@ -144,7 +146,6 @@
     overflow: hidden;
   }
 
-  /* Drag handle between editor and side pane */
   .resize-handle {
     background: var(--separator);
     cursor: col-resize;
@@ -154,7 +155,6 @@
   .resize-handle:hover,
   .resize-handle.dragging { background: var(--accent); }
   .resize-handle::before {
-    /* Wider hit-area centered on the visible bar */
     content: "";
     position: absolute;
     top: 0; bottom: 0;
@@ -167,169 +167,49 @@
     background: var(--bg);
     overflow: hidden;
   }
-  .editor-wrap {
-    display: grid;
-    grid-template-columns: 48px 1fr;
+  #monaco-container {
     width: 100%;
     height: 100%;
   }
-
-  /* Line-number gutter */
-  .gutter {
-    background: var(--bg-gutter);
-    border-right: 1px solid var(--separator);
-    padding: var(--pad-y) 6px var(--pad-y) 0;
-    font-family: var(--code-font);
-    font-size: var(--code-size);
-    line-height: var(--code-line);
+  /* Loading state shown before Monaco initialises */
+  #monaco-container.loading::before {
+    content: "Loading editor…";
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
     color: var(--text-3);
-    text-align: right;
-    user-select: none;
-    overflow: hidden;
-    white-space: pre;
+    font-family: var(--code-font);
+    font-size: 13px;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  #monaco-container.error::before {
+    content: "Editor failed to load — check internet connection and refresh.";
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--red);
+    font-family: var(--code-font);
+    font-size: 13px;
+    text-align: center;
   }
 
-  /* Editor content area (highlight + ghost + textarea + floating card) */
-  .editor-content {
-    position: relative;
-    overflow: hidden;
-    transition: box-shadow 160ms;
-  }
-  .editor-content.focused {
-    box-shadow: inset 0 0 0 1px rgba(10,132,255,0.28);
-  }
-  .editor-content.accepted::before {
+  /* Accept-flash overlay */
+  .editor-pane.accepted::after {
     content: "";
     position: absolute;
     inset: 0;
     background: rgba(48,209,88,0.10);
     pointer-events: none;
-    animation: accept-flash 380ms ease-out;
-    z-index: 8;
+    animation: accept-flash 380ms var(--ease-out);
+    z-index: 50;
   }
   @keyframes accept-flash {
     0%   { opacity: 1; }
     100% { opacity: 0; }
   }
 
-  /* All three layers share metrics so characters line up exactly */
-  .highlight-layer, .ghost-layer, textarea {
-    position: absolute;
-    inset: 0;
-    margin: 0;
-    padding: var(--pad-y) var(--pad-x);
-    font-family: var(--code-font);
-    font-size: var(--code-size);
-    line-height: var(--code-line);
-    white-space: pre;
-    word-wrap: normal;
-    border: 0;
-    background: transparent;
-    overflow: auto;
-    tab-size: 4;
-  }
-  .highlight-layer {
-    color: var(--text-1);
-    pointer-events: none;
-    user-select: none;
-    z-index: 1;
-  }
-  .highlight-layer code {
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
-    background: transparent;
-    padding: 0;
-    color: inherit;
-    display: inline;
-  }
-  .ghost-layer {
-    color: transparent;
-    pointer-events: none;
-    user-select: none;
-    z-index: 2;
-  }
-  textarea {
-    /* Text is transparent so the highlight layer shows through.
-       Caret stays visible via caret-color. */
-    color: transparent;
-    caret-color: var(--accent);
-    resize: none;
-    outline: none;
-    z-index: 3;
-  }
-  textarea::selection { background: rgba(10,132,255,0.30); }
-  textarea::placeholder { color: var(--text-3); opacity: 1; }
-  /* When highlight.js failed to load, fall back to plain visible text */
-  .editor-content.no-hl textarea { color: var(--text-1); }
-  .editor-content.no-hl .highlight-layer { display: none; }
-
-  .ghost-suggestion {
-    color: var(--text-3);
-    font-style: italic;
-  }
-  .ghost-suggestion.fade-out { animation: ghost-out 200ms forwards; }
-  @keyframes ghost-out {
-    to { opacity: 0; transform: translateX(8px); }
-  }
-  .ghost-suggestion span,
-  .floating-card span.tok,
-  .suggestion-box span.tok { transition: color 150ms; }
-
-  /* Inline "Tab to accept" hint right after ghost text */
-  .tab-hint {
-    display: inline-block;
-    margin-left: 8px;
-    padding: 1px 7px 2px;
-    background: rgba(10,132,255,0.18);
-    color: var(--accent);
-    border-radius: 5px;
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 10px;
-    font-weight: 600;
-    font-style: normal;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    vertical-align: 1px;
-    opacity: 0;
-    animation: hint-in 220ms 350ms forwards;
-  }
-  @keyframes hint-in {
-    from { opacity: 0; transform: translateX(-4px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-
-  /* ── highlight.js — Dracula-ish theme tuned to macOS dark ─── */
-  .hljs-keyword,
-  .hljs-literal,
-  .hljs-meta-keyword     { color: #ff79c6; }
-  .hljs-built_in,
-  .hljs-class .hljs-title,
-  .hljs-type             { color: #8be9fd; }
-  .hljs-string,
-  .hljs-template-string  { color: #f1fa8c; }
-  .hljs-number,
-  .hljs-regexp           { color: #bd93f9; }
-  .hljs-comment,
-  .hljs-quote            { color: var(--text-3); font-style: italic; }
-  .hljs-function .hljs-title,
-  .hljs-title.function_  { color: #50fa7b; }
-  .hljs-params           { color: var(--text-1); }
-  .hljs-variable,
-  .hljs-attr             { color: var(--text-1); }
-  .hljs-symbol,
-  .hljs-bullet           { color: #ffb86c; }
-  .hljs-operator,
-  .hljs-meta             { color: #ff79c6; }
-  .hljs-punctuation      { color: var(--text-2); }
-  .hljs-tag              { color: #ff79c6; }
-  .hljs-name             { color: #50fa7b; }
-  .hljs-decorator,
-  .hljs-meta .hljs-string { color: #ffb86c; }
-
-  /* ── Floating card (medium-confidence "collapsed" tier) ───── */
+  /* ── Floating card (Monaco content widget for medium tier) ── */
   .floating-card {
-    position: absolute;
     background: rgba(44,44,46,0.96);
     border: 1px solid var(--separator);
     border-left: 2px solid var(--orange);
@@ -339,15 +219,18 @@
     padding: 8px 11px 9px;
     max-width: 480px;
     min-width: 180px;
-    z-index: 6;
     opacity: 0;
-    transform: translateY(-4px);
-    transition: opacity 180ms, transform 180ms;
+    transform: translateY(-6px) scale(0.96);
+    transform-origin: top left;
+    transition: opacity 200ms, transform 280ms var(--ease-spring);
     pointer-events: auto;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.48);
+    /* Monaco wraps this in its own positioning layer; we just style */
   }
-  .floating-card.show { opacity: 1; transform: translateY(0); }
-  .floating-card.hidden { display: none; }
+  .floating-card.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
   .floating-card .fc-header {
     display: flex;
     justify-content: space-between;
@@ -368,8 +251,9 @@
     white-space: pre;
     color: var(--text-1);
     overflow: hidden;
-    max-height: 1.5em;        /* collapsed: one line */
-    transition: max-height 220ms ease;
+    max-height: 1.5em;
+    transition: max-height 240ms var(--ease-out);
+    cursor: pointer;
   }
   .floating-card.expanded .fc-body { max-height: 320px; overflow: auto; }
   .floating-card .fc-more {
@@ -378,10 +262,11 @@
     margin-top: 5px;
     cursor: pointer;
     user-select: none;
+    transition: color 140ms;
   }
   .floating-card .fc-more:hover { color: var(--text-2); }
 
-  /* ── Floating activity chip in editor ─────────────────────── */
+  /* ── Floating activity chip ───────────────────────────────── */
   .activity-chip {
     position: absolute;
     bottom: 18px;
@@ -399,17 +284,18 @@
     font-weight: 500;
     color: var(--text-2);
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px) scale(0.94);
     pointer-events: none;
-    transition: opacity 220ms, transform 220ms;
+    transition: opacity 220ms, transform 320ms var(--ease-spring);
     z-index: 5;
     box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   }
-  .activity-chip.show { opacity: 1; transform: translateY(0); }
+  .activity-chip.show { opacity: 1; transform: translateY(0) scale(1); }
   .activity-chip .dot {
     width: 7px; height: 7px;
     border-radius: 50%;
     background: var(--gray);
+    transition: background 200ms;
   }
   .activity-chip[data-state="thinking"]   { color: var(--yellow); }
   .activity-chip[data-state="thinking"]   .dot { background: var(--yellow); animation: pulse 1.4s ease-in-out infinite; }
@@ -465,11 +351,13 @@
     width: 9px; height: 9px;
     border-radius: 50%;
     background: var(--gray);
+    transition: background 220ms;
   }
   .activity-row .label {
     font-size: 13px;
     font-weight: 500;
     color: var(--text-2);
+    transition: color 220ms;
   }
   .activity-row[data-state="thinking"]   .dot { background: var(--yellow); animation: pulse 1.4s ease-in-out infinite; }
   .activity-row[data-state="thinking"]   .label { color: var(--yellow); }
@@ -500,7 +388,8 @@
     width: 0%;
     background: var(--gray);
     border-radius: 999px;
-    transition: width 250ms cubic-bezier(0.32, 0.72, 0, 1), background 250ms;
+    /* Spring overshoot for satisfying snap */
+    transition: width 380ms var(--ease-spring), background 280ms;
   }
   .meter-fill.inline    { background: var(--green); }
   .meter-fill.collapsed { background: var(--orange); }
@@ -511,8 +400,10 @@
     width: 1px;
     background: rgba(255,255,255,0.45);
     pointer-events: none;
+    transition: left 240ms var(--ease-out);
   }
 
+  /* Mode badge */
   .mode-badge {
     font-size: 11px;
     font-weight: 600;
@@ -522,11 +413,15 @@
     color: var(--text-2);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    transition: background 280ms, color 280ms, transform 320ms var(--ease-spring);
+    transform-origin: center;
   }
+  .mode-badge.bump { transform: scale(1.08); }
   .mode-badge.inline    { background: rgba(48,209,88,0.16);  color: var(--green); }
   .mode-badge.collapsed { background: rgba(255,159,10,0.16); color: var(--orange); }
   .mode-badge.hidden    { background: rgba(255,255,255,0.08); color: var(--text-3); }
 
+  /* Per-token analysis box */
   .suggestion-box {
     background: rgba(0,0,0,0.25);
     border: 1px solid var(--separator);
@@ -551,7 +446,9 @@
     display: flex;
     align-items: center;
   }
-  .tok { cursor: help; }
+  .tok { cursor: help; transition: color 180ms; }
+  .floating-card span.tok,
+  .suggestion-box span.tok { transition: color 150ms; }
 
   .legend-bar {
     height: 5px;
@@ -576,6 +473,7 @@
     font-weight: 600;
   }
 
+  /* Threshold sliders */
   .threshold-row { margin-top: 12px; }
   .threshold-label {
     display: flex;
@@ -612,7 +510,9 @@
     cursor: pointer;
     border: 2px solid var(--card);
     box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    transition: transform 140ms var(--ease-spring);
   }
+  input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.25); }
   input[type="range"]::-moz-range-thumb {
     width: 14px; height: 14px;
     background: var(--accent);
@@ -621,7 +521,7 @@
     border: 2px solid var(--card);
   }
 
-  /* Session metrics card */
+  /* Session metrics */
   .session-grid {
     display: grid;
     grid-template-columns: 1fr auto;
@@ -630,9 +530,29 @@
     font-size: 12px;
   }
   .session-grid .key   { color: var(--text-2); }
-  .session-grid .val   { color: var(--text-1); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .session-grid .val   {
+    color: var(--text-1);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    transition: color 180ms;
+  }
+  .session-grid .val.bump {
+    animation: count-bump 380ms var(--ease-spring);
+  }
+  @keyframes count-bump {
+    0%   { color: var(--text-1); transform: translateY(0); }
+    30%  { color: var(--accent); transform: translateY(-2px); }
+    100% { color: var(--text-1); transform: translateY(0); }
+  }
   .session-grid .sub   { color: var(--text-3); font-size: 11px; padding-left: 12px; }
-  .session-grid .sub-val { color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .session-grid .sub-val {
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+    transition: color 180ms;
+  }
+  .session-grid .sub-val.bump {
+    animation: count-bump 380ms var(--ease-spring);
+  }
   .session-grid .accept-rate {
     grid-column: 1 / -1;
     margin-top: 4px;
@@ -652,7 +572,6 @@
   }
   .reset-btn:hover { background: rgba(255,255,255,0.12); color: var(--text-1); }
 
-  /* Hints */
   .hint {
     font-size: 11.5px;
     color: var(--text-2);
@@ -670,7 +589,7 @@
     color: var(--text-1);
   }
 
-  /* Token hover tooltip (floats above the page) */
+  /* Token hover tooltip */
   .tok-tooltip {
     position: fixed;
     background: rgba(28,28,30,0.96);
@@ -683,13 +602,14 @@
     color: var(--text-1);
     pointer-events: none;
     opacity: 0;
-    transform: translate(-50%, 4px);
-    transition: opacity 120ms, transform 120ms;
+    transform: translate(-50%, 4px) scale(0.94);
+    transform-origin: top center;
+    transition: opacity 140ms, transform 200ms var(--ease-spring);
     z-index: 100;
     box-shadow: 0 4px 14px rgba(0,0,0,0.5);
     white-space: nowrap;
   }
-  .tok-tooltip.show { opacity: 1; transform: translate(-50%, 0); }
+  .tok-tooltip.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
   .tok-tooltip .row {
     display: flex;
     justify-content: space-between;
@@ -699,7 +619,7 @@
   .tok-tooltip .key { color: var(--text-3); }
   .tok-tooltip .val { color: var(--text-1); font-variant-numeric: tabular-nums; }
 
-  /* macOS-style scrollbars */
+  /* macOS-style scrollbars (outside Monaco — Monaco has its own) */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-thumb {
     background: rgba(255,255,255,0.12);
@@ -710,16 +630,6 @@
   ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.22); }
   ::-webkit-scrollbar-track { background: transparent; }
 
-  /* Mirror div used by getCaretCoords (kept off-screen, never visible) */
-  .caret-mirror {
-    position: absolute;
-    top: 0; left: -9999px;
-    visibility: hidden;
-    white-space: pre;
-    word-wrap: normal;
-    overflow: hidden;
-  }
-
   /* ── Settings drawer ──────────────────────────────────────── */
   .drawer-backdrop {
     position: fixed;
@@ -728,7 +638,7 @@
     z-index: 200;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 200ms;
+    transition: opacity 220ms;
   }
   .drawer-backdrop.show {
     opacity: 1;
@@ -744,7 +654,7 @@
     border-left: 1px solid var(--separator);
     z-index: 201;
     transform: translateX(100%);
-    transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+    transition: transform 320ms var(--ease-out);
     display: flex;
     flex-direction: column;
     overflow: auto;
@@ -786,7 +696,15 @@
     background: var(--card);
     border-radius: 10px;
     padding: 14px;
+    /* Stagger reveal */
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 280ms, transform 280ms var(--ease-out);
   }
+  .settings-drawer.show .setting-group { opacity: 1; transform: translateY(0); }
+  .settings-drawer.show .setting-group:nth-child(1) { transition-delay: 100ms; }
+  .settings-drawer.show .setting-group:nth-child(2) { transition-delay: 160ms; }
+
   .setting-group .group-title {
     font-size: 10px;
     font-weight: 700;
@@ -823,7 +741,7 @@
     position: absolute; inset: 0;
     background: rgba(255,255,255,0.16);
     border-radius: 999px;
-    transition: background 160ms;
+    transition: background 200ms;
     cursor: pointer;
   }
   .toggle .slider::before {
@@ -833,18 +751,26 @@
     width: 16px; height: 16px;
     background: #fff;
     border-radius: 50%;
-    transition: transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
+    transition: transform 240ms var(--ease-spring);
     box-shadow: 0 1px 3px rgba(0,0,0,0.4);
   }
   .toggle input:checked + .slider { background: var(--green); }
   .toggle input:checked + .slider::before { transform: translateX(16px); }
+
+  /* ── Monaco overrides ─────────────────────────────────────── */
+  /* Push Monaco's content widget margins so the floating card has room */
+  .monaco-editor .overflow-guard { border-radius: 0; }
+  /* Monaco's inline suggestion ghost text colour is set by theme; below
+     softens it slightly so it whispers rather than shouts. */
+  .monaco-editor .ghost-text-decoration {
+    opacity: 0.78;
+    font-style: italic;
+  }
 </style>
 
-<!-- highlight.js for syntax highlighting (with onerror fallback) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"
-        onerror="window.__hljsFailed = true"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"
-        onerror="window.__hljsFailed = true"></script>
+<!-- Monaco Editor (loaded via AMD) -->
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"
+        onerror="window.__monacoFailed = true"></script>
 </head>
 <body>
 
@@ -862,29 +788,12 @@
 </header>
 
 <main id="main">
-  <div class="editor-pane">
-    <div class="editor-wrap">
-      <div class="gutter" id="gutter"></div>
-      <div class="editor-content" id="editor-content">
-        <pre class="highlight-layer" id="highlight-layer"><code id="highlight-code" class="language-python"></code></pre>
-        <div class="ghost-layer" id="ghost"><span id="ghost-prefix"></span><span class="ghost-suggestion" id="ghost-suggestion"></span><span class="tab-hint" id="tab-hint" style="display:none">⇥ Tab</span></div>
-        <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"
-          placeholder="Start typing Python here…&#10;&#10;def sort_list(arr):&#10;    "></textarea>
+  <div class="editor-pane" id="editor-pane">
+    <div id="monaco-container" class="loading"></div>
 
-        <div class="floating-card hidden" id="floating-card">
-          <div class="fc-header">
-            <span>Suggestion · medium confidence</span>
-            <span class="keys"><kbd>Tab</kbd> accept <kbd>Esc</kbd> dismiss</span>
-          </div>
-          <div class="fc-body" id="floating-body"></div>
-          <div class="fc-more" id="floating-more" style="display:none"></div>
-        </div>
-
-        <div class="activity-chip" id="activity-chip" data-state="idle">
-          <span class="dot"></span>
-          <span id="activity-chip-text">Idle</span>
-        </div>
-      </div>
+    <div class="activity-chip" id="activity-chip" data-state="idle">
+      <span class="dot"></span>
+      <span id="activity-chip-text">Idle</span>
     </div>
   </div>
 
@@ -982,6 +891,16 @@
 
 <div class="tok-tooltip" id="tok-tooltip"></div>
 
+<!-- Floating card lives at the document root; Monaco re-parents it as a content widget -->
+<div class="floating-card" id="floating-card" style="display:none">
+  <div class="fc-header">
+    <span>Suggestion · medium confidence</span>
+    <span class="keys"><kbd>Tab</kbd> accept <kbd>Esc</kbd> dismiss</span>
+  </div>
+  <div class="fc-body" id="floating-body"></div>
+  <div class="fc-more" id="floating-more" style="display:none"></div>
+</div>
+
 <!-- Settings drawer -->
 <div class="drawer-backdrop" id="drawer-backdrop"></div>
 <aside class="settings-drawer" id="settings-drawer" aria-hidden="true">
@@ -1000,7 +919,7 @@
           <span class="val" id="set-debounce-val">400 ms</span>
         </div>
         <input type="range" id="set-debounce" min="100" max="1000" step="50" value="400">
-        <div class="help">How long to wait after the last keystroke before requesting a suggestion. Lower = snappier, higher = fewer wasted requests.</div>
+        <div class="help">Wait time after the last keystroke before requesting a suggestion.</div>
       </div>
 
       <div class="setting-row">
@@ -1009,7 +928,7 @@
           <span class="val" id="set-maxtok-val">64</span>
         </div>
         <input type="range" id="set-maxtok" min="16" max="256" step="8" value="64">
-        <div class="help">Upper bound on completion length. Higher = longer suggestions, slower responses.</div>
+        <div class="help">Upper bound on completion length.</div>
       </div>
     </div>
 
@@ -1021,15 +940,7 @@
           <span class="label">Auto-retrigger after accept</span>
           <label class="toggle"><input type="checkbox" id="set-retrigger" checked><span class="slider"></span></label>
         </div>
-        <div class="help">After you accept a suggestion, automatically request the next one (Copilot-style continuation). Press Esc to dismiss.</div>
-      </div>
-
-      <div class="setting-row">
-        <div class="label-row">
-          <span class="label">Bracket auto-close</span>
-          <label class="toggle"><input type="checkbox" id="set-brackets" checked><span class="slider"></span></label>
-        </div>
-        <div class="help">Auto-insert closing <code>) ] } " ' `</code> and skip-over the closer when typed. Smart backspace deletes empty pairs.</div>
+        <div class="help">After you accept, automatically request the next suggestion.</div>
       </div>
     </div>
 
@@ -1039,28 +950,17 @@
 <script>
 "use strict";
 
-const API_BASE = "http://localhost:8000";
+// ─── Constants ──────────────────────────────────────────────────────
+const API_BASE      = "http://localhost:8000";
 const STORAGE_KEY   = "promptsuggest.editor.v1";
 const SETTINGS_KEY  = "promptsuggest.settings.v1";
 const THRESHOLD_KEY = "promptsuggest.thresholds.v1";
 const SIDE_WIDTH_KEY= "promptsuggest.sideWidth.v1";
-const CACHE_TTL_MS = 60_000;
-const CACHE_MAX = 50;
+const CACHE_TTL_MS  = 60_000;
+const CACHE_MAX     = 50;
 const RETRIGGER_DELAY_MS = 500;
 
-// ── DOM refs ─────────────────────────────────────────────────────
-const editor          = document.getElementById("editor");
-const editorContent   = document.getElementById("editor-content");
-const gutter          = document.getElementById("gutter");
-const highlightLayer  = document.getElementById("highlight-layer");
-const highlightCode   = document.getElementById("highlight-code");
-const ghostLayer      = document.getElementById("ghost");
-const ghostPrefix     = document.getElementById("ghost-prefix");
-const ghostSuggestion = document.getElementById("ghost-suggestion");
-const tabHint         = document.getElementById("tab-hint");
-const floatingCard    = document.getElementById("floating-card");
-const floatingBody    = document.getElementById("floating-body");
-const floatingMore    = document.getElementById("floating-more");
+// ─── Static DOM refs (no Monaco needed) ─────────────────────────────
 const statusEl        = document.getElementById("status");
 const statusText      = document.getElementById("status-text");
 const confidenceNum   = document.getElementById("confidence-num");
@@ -1075,6 +975,8 @@ const settingsBtn     = document.getElementById("settings-btn");
 const settingsDrawer  = document.getElementById("settings-drawer");
 const drawerBackdrop  = document.getElementById("drawer-backdrop");
 const settingsClose   = document.getElementById("settings-close");
+const editorPane      = document.getElementById("editor-pane");
+const monacoContainer = document.getElementById("monaco-container");
 const activityChip    = document.getElementById("activity-chip");
 const activityChipText= document.getElementById("activity-chip-text");
 const activityRow     = document.getElementById("activity-row");
@@ -1086,6 +988,9 @@ const highVal         = document.getElementById("high-val");
 const lowVal          = document.getElementById("low-val");
 const tokTooltip      = document.getElementById("tok-tooltip");
 const resizeHandle    = document.getElementById("resize-handle");
+const floatingCardEl  = document.getElementById("floating-card");
+const floatingBody    = document.getElementById("floating-body");
+const floatingMore    = document.getElementById("floating-more");
 // Session metrics
 const mShown          = document.getElementById("m-shown");
 const mShownInline    = document.getElementById("m-shown-inline");
@@ -1106,25 +1011,30 @@ const setDebounceVal= document.getElementById("set-debounce-val");
 const setMaxtok     = document.getElementById("set-maxtok");
 const setMaxtokVal  = document.getElementById("set-maxtok-val");
 const setRetrigger  = document.getElementById("set-retrigger");
-const setBrackets   = document.getElementById("set-brackets");
 
-// ── State ────────────────────────────────────────────────────────
-let currentSuggestion  = null;     // {completion, confidence, tokens, prefix, ui_mode, _shown}
-let debounceTimer      = null;
-let retriggerTimer     = null;
-let inflight           = null;
-let inflightPrefix     = null;
-let readyTimer         = null;
-let lastInputType      = null;     // 'insert' | 'delete' | null
-let suppressNextInputTrigger = false;  // set when accept fires synthetic input
-let thresholds         = { high: 0.80, low: 0.40 };
-const responseCache    = new Map();
+// ─── State ──────────────────────────────────────────────────────────
+let editor = null;     // Monaco editor instance (set after init)
+let model  = null;     // Monaco text model
+let floatingWidget = null;  // Monaco content widget for floating card
+
+// Pending completion (queue between fetch + Monaco's inline-suggest provider)
+let pendingCompletion = null;        // {completion, confidence, tokens}
+let pendingCompletionPrefix = null;
+let currentSuggestion = null;        // {completion, confidence, tokens, prefix, ui_mode, _shown}
+
+let debounceTimer  = null;
+let retriggerTimer = null;
+let inflight       = null;
+let inflightPrefix = null;
+let readyTimer     = null;
+
+let thresholds   = { high: 0.80, low: 0.40 };
+const responseCache = new Map();
 
 let settings = {
   debounceMs: 400,
   maxNewTokens: 64,
   autoRetrigger: true,
-  bracketAutoClose: true,
 };
 
 const session = {
@@ -1134,7 +1044,7 @@ const session = {
   rejected: { esc: 0, typed: 0 },
 };
 
-// ── Settings load/save ───────────────────────────────────────────
+// ─── Settings persistence ───────────────────────────────────────────
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
@@ -1151,22 +1061,14 @@ function loadSettings() {
     }
   } catch {}
 }
-function saveSettings() {
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
-}
-function saveThresholds() {
-  try { localStorage.setItem(THRESHOLD_KEY, JSON.stringify(thresholds)); } catch {}
-}
+function saveSettings()   { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }
+function saveThresholds() { try { localStorage.setItem(THRESHOLD_KEY, JSON.stringify(thresholds)); } catch {} }
 
-// ── AI activity state machine ────────────────────────────────────
+// ─── AI activity state ──────────────────────────────────────────────
 const STATE_LABELS = {
-  idle:       "Idle",
-  thinking:   "Thinking…",
-  generating: "Generating…",
-  ready:      "Suggestion ready",
-  error:      "Error",
+  idle: "Idle", thinking: "Thinking…", generating: "Generating…",
+  ready: "Suggestion ready", error: "Error",
 };
-
 function setAiState(state, detail = "") {
   clearTimeout(readyTimer);
   const label = STATE_LABELS[state] ?? state;
@@ -1174,44 +1076,31 @@ function setAiState(state, detail = "") {
   activityText.textContent = label;
   activityDetail.textContent = detail;
   activityChip.dataset.state = state;
-  activityChipText.textContent = label;
+  activityChipText.textContent = state === "ready" && currentSuggestion ? "⇥ Tab" : label;
   if (state === "idle") activityChip.classList.remove("show");
   else                  activityChip.classList.add("show");
-  if (state === "ready") {
-    readyTimer = setTimeout(() => setAiState("idle"), 1600);
-  }
+  if (state === "ready") readyTimer = setTimeout(() => setAiState("idle"), 1800);
 }
 
-// ── Cache ────────────────────────────────────────────────────────
+// ─── Cache ──────────────────────────────────────────────────────────
 function cacheGet(prefix) {
   const e = responseCache.get(prefix);
   if (!e) return null;
-  if (Date.now() - e.ts > CACHE_TTL_MS) {
-    responseCache.delete(prefix);
-    return null;
-  }
-  responseCache.delete(prefix);
-  responseCache.set(prefix, e);
+  if (Date.now() - e.ts > CACHE_TTL_MS) { responseCache.delete(prefix); return null; }
+  responseCache.delete(prefix); responseCache.set(prefix, e);
   return e.result;
 }
 function cacheSet(prefix, result) {
   responseCache.set(prefix, { result, ts: Date.now() });
-  while (responseCache.size > CACHE_MAX) {
-    responseCache.delete(responseCache.keys().next().value);
-  }
+  while (responseCache.size > CACHE_MAX) responseCache.delete(responseCache.keys().next().value);
 }
-
 function cancelPending() {
   clearTimeout(debounceTimer);
   clearTimeout(retriggerTimer);
-  if (inflight) {
-    inflight.abort();
-    inflight = null;
-    inflightPrefix = null;
-  }
+  if (inflight) { inflight.abort(); inflight = null; inflightPrefix = null; }
 }
 
-// ── Health check ─────────────────────────────────────────────────
+// ─── Health check ───────────────────────────────────────────────────
 async function checkHealth() {
   try {
     const r = await fetch(`${API_BASE}/health`);
@@ -1232,231 +1121,35 @@ async function checkHealth() {
 }
 checkHealth();
 
-// ── Caret coords (mirror-div technique) ──────────────────────────
-const mirrorDiv = document.createElement("div");
-mirrorDiv.className = "caret-mirror";
-document.body.appendChild(mirrorDiv);
-
-const COPY_PROPS = [
-  "boxSizing","width","height","overflowX","overflowY",
-  "paddingTop","paddingRight","paddingBottom","paddingLeft",
-  "borderTopWidth","borderRightWidth","borderBottomWidth","borderLeftWidth",
-  "fontFamily","fontSize","fontWeight","fontStyle","fontVariant",
-  "fontStretch","fontVariationSettings",
-  "lineHeight","letterSpacing","textAlign","textTransform",
-  "whiteSpace","wordWrap","wordBreak","wordSpacing","tabSize",
-];
-
-function getCaretCoords(input, position) {
-  const styles = getComputedStyle(input);
-  mirrorDiv.removeAttribute("style");
-  mirrorDiv.className = "caret-mirror";
-  for (const p of COPY_PROPS) mirrorDiv.style[p] = styles[p];
-
-  const text = input.value.slice(0, position);
-  mirrorDiv.textContent = text;
-
-  const span = document.createElement("span");
-  span.textContent = input.value.charAt(position) || ".";
-  mirrorDiv.appendChild(span);
-
-  const inputRect  = input.getBoundingClientRect();
-  const mirrorRect = mirrorDiv.getBoundingClientRect();
-  const spanRect   = span.getBoundingClientRect();
-
-  const top  = (spanRect.top  - mirrorRect.top)  - input.scrollTop;
-  const left = (spanRect.left - mirrorRect.left) - input.scrollLeft;
-  const lineHeight = parseFloat(styles.lineHeight) || (parseFloat(styles.fontSize) * 1.4);
-  return { top, left, lineHeight, inputRect };
-}
-
-function positionFloatingCard() {
-  if (floatingCard.classList.contains("hidden")) return;
-  const caret = getCaretCoords(editor, editor.selectionStart);
-  const contentRect = editorContent.getBoundingClientRect();
-  const editorRect  = caret.inputRect;
-
-  let left = (editorRect.left - contentRect.left) + caret.left;
-  let top  = (editorRect.top  - contentRect.top)  + caret.top + caret.lineHeight + 4;
-
-  floatingCard.style.left = "0px";
-  floatingCard.style.top  = "0px";
-  const cardRect = floatingCard.getBoundingClientRect();
-
-  const maxLeft = contentRect.width - cardRect.width - 8;
-  if (left > maxLeft) left = Math.max(8, maxLeft);
-  if (left < 8) left = 8;
-
-  const wouldOverflowBottom = top + cardRect.height > contentRect.height - 8;
-  if (wouldOverflowBottom) {
-    top = (editorRect.top - contentRect.top) + caret.top - cardRect.height - 4;
-    if (top < 8) top = 8;
-  }
-
-  floatingCard.style.left = left + "px";
-  floatingCard.style.top  = top  + "px";
-}
-
-// ── Per-token color (heatmap) ────────────────────────────────────
+// ─── Per-token visualization ────────────────────────────────────────
 function colorForLogprob(logprob) {
   const prob = Math.exp(logprob);
   const hue = Math.round(prob * 120);
   return `hsl(${hue}, 60%, 60%)`;
 }
-function buildTokenSpans(tokens, { dim = false } = {}) {
+function buildTokenSpans(tokens) {
   const frag = document.createDocumentFragment();
   for (const tok of tokens) {
     const span = document.createElement("span");
     span.textContent = tok.text;
     span.className = "tok";
     span.style.color = colorForLogprob(tok.logprob);
-    if (dim) span.style.opacity = "0.85";
     span.dataset.logprob = String(tok.logprob);
     frag.appendChild(span);
   }
   return frag;
 }
 
-// ── UI mode by threshold ─────────────────────────────────────────
-function uiModeFor(confidence) {
-  if (confidence >= thresholds.high) return "inline";
-  if (confidence >= thresholds.low)  return "collapsed";
-  return "hidden";
-}
-
-// ── Render the three UI tiers ────────────────────────────────────
-function renderSuggestion(prefix, s) {
-  if (!s || !s.completion) { clearSuggestion(); return; }
-  const wasNewSuggestion = !s._shown;
-  s = { ...s, prefix };
-  currentSuggestion = s;
-
-  const { completion, confidence, tokens } = s;
-  const tokenList = Array.isArray(tokens) ? tokens : [];
-  const ui_mode = uiModeFor(confidence);
-  s.ui_mode = ui_mode;
-
-  // Count "shown" only the first time this suggestion is rendered.
-  // Re-renders from threshold-slider changes don't re-count.
-  if (wasNewSuggestion) {
-    s._shown = true;
-    session.shown[ui_mode]++;
-    updateSessionMetrics();
-  }
-
-  confidenceNum.textContent = `${(confidence * 100).toFixed(1)}%`;
-  meterFill.style.width = `${Math.min(confidence * 100, 100)}%`;
-  meterFill.className = `meter-fill ${ui_mode}`;
-  modeBadge.textContent = ui_mode;
-  modeBadge.className = `mode-badge ${ui_mode}`;
-
-  if (ui_mode === "hidden") {
-    suggestionBox.textContent = "Suppressed (confidence below threshold).";
-    suggestionBox.className = "suggestion-box empty";
-    hideGhost();
-    hideFloating();
-    return;
-  }
-
-  suggestionBox.className = "suggestion-box";
-  if (tokenList.length > 0) suggestionBox.replaceChildren(buildTokenSpans(tokenList));
-  else                      suggestionBox.textContent = completion;
-
-  if (ui_mode === "inline" && cursorIsAtPrefixEnd(prefix) && cursorIsAtEndOfLine()) {
-    showGhost(prefix, completion, tokenList);
-    hideFloating();
-  } else {
-    hideGhost();
-    showFloating(completion, tokenList);
-  }
-}
-
-function showGhost(prefix, completion, tokens) {
-  ghostPrefix.textContent = prefix;
-  if (tokens.length > 0) {
-    ghostSuggestion.replaceChildren(buildTokenSpans(tokens, { dim: true }));
-  } else {
-    ghostSuggestion.textContent = completion;
-  }
-  ghostSuggestion.classList.remove("fade-out");
-  tabHint.style.display = "inline-block";
-}
-function hideGhost() {
-  ghostPrefix.textContent = "";
-  ghostSuggestion.replaceChildren();
-  ghostSuggestion.classList.remove("fade-out");
-  tabHint.style.display = "none";
-}
-
-function showFloating(completion, tokens) {
-  floatingCard.classList.remove("hidden", "expanded");
-  if (tokens.length > 0) floatingBody.replaceChildren(buildTokenSpans(tokens));
-  else                   floatingBody.textContent = completion;
-  const lines = completion.split("\n");
-  if (lines.length > 1) {
-    floatingMore.textContent = `▾ +${lines.length - 1} more line${lines.length > 2 ? "s" : ""} · Alt+\\ to expand`;
-    floatingMore.style.display = "block";
-  } else {
-    floatingMore.style.display = "none";
-  }
-  requestAnimationFrame(() => {
-    positionFloatingCard();
-    floatingCard.classList.add("show");
-  });
-}
-function hideFloating() {
-  floatingCard.classList.remove("show", "expanded");
-  setTimeout(() => {
-    if (!floatingCard.classList.contains("show")) {
-      floatingCard.classList.add("hidden");
-    }
-  }, 200);
-}
-
-function clearSuggestion() {
-  currentSuggestion = null;
-  hideGhost();
-  hideFloating();
-  confidenceNum.textContent = "—";
-  meterFill.style.width = "0%";
-  meterFill.className = "meter-fill";
-  modeBadge.textContent = "—";
-  modeBadge.className = "mode-badge";
-  suggestionBox.textContent = "No suggestion yet.";
-  suggestionBox.className = "suggestion-box empty";
-}
-
-// ── Trigger validity ─────────────────────────────────────────────
-function cursorIsAtPrefixEnd(prefix) {
-  return editor.value.slice(0, editor.selectionStart) === prefix;
-}
-function cursorIsAtEndOfLine() {
-  const pos = editor.selectionStart;
-  const text = editor.value;
-  for (let i = pos; i < text.length; i++) {
-    const c = text[i];
-    if (c === "\n") return true;
-    if (c !== " " && c !== "\t") return false;
-  }
-  return true;
-}
-function selectionIsCollapsed() {
-  return editor.selectionStart === editor.selectionEnd;
-}
-
-// ── Backend call ─────────────────────────────────────────────────
+// ─── HTTP ───────────────────────────────────────────────────────────
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
-
 async function requestCompletion(prefix) {
   const cached = cacheGet(prefix);
   if (cached) return cached;
-
   if (inflight) inflight.abort();
   const ctrl = new AbortController();
-  inflight = ctrl;
-  inflightPrefix = prefix;
+  inflight = ctrl; inflightPrefix = prefix;
   try {
     const r = await fetch(`${API_BASE}/api/complete`, {
       method: "POST",
@@ -1473,13 +1166,9 @@ async function requestCompletion(prefix) {
     cacheSet(prefix, json);
     return json;
   } finally {
-    if (inflight === ctrl) {
-      inflight = null;
-      inflightPrefix = null;
-    }
+    if (inflight === ctrl) { inflight = null; inflightPrefix = null; }
   }
 }
-
 function describeError(err) {
   return err instanceof HttpError
     ? (err.status === 503 ? "Backend is still loading the model. Retry shortly."
@@ -1487,349 +1176,14 @@ function describeError(err) {
     : "Cannot reach backend at " + API_BASE + ".";
 }
 
-// ── Trigger logic (factored out for input + auto-retrigger) ──────
-// `immediate=true` skips the user-typing debounce. Used after accept.
-function scheduleCompletion(prefix, { immediate = false } = {}) {
-  clearTimeout(debounceTimer);
-  if (!prefix.trim()) {
-    setAiState("idle");
-    return;
-  }
-  const cached = cacheGet(prefix);
-  if (cached) {
-    renderSuggestion(prefix, cached);
-    setAiState("ready");
-    return;
-  }
-  if (!immediate) setAiState("thinking");
-
-  const fire = async () => {
-    setAiState("generating");
-    try {
-      const result = await requestCompletion(prefix);
-      const currentPrefix = editor.value.slice(0, editor.selectionStart);
-      if (currentPrefix === prefix) {
-        renderSuggestion(prefix, result);
-        setAiState("ready");
-      } else {
-        setAiState("idle");
-      }
-    } catch (err) {
-      if (err.name === "AbortError") return;
-      console.error(err);
-      setAiState("error", describeError(err));
-    }
-  };
-  if (immediate) fire();
-  else           debounceTimer = setTimeout(fire, settings.debounceMs);
+// ─── Threshold-driven UI mode ───────────────────────────────────────
+function uiModeFor(confidence) {
+  if (confidence >= thresholds.high) return "inline";
+  if (confidence >= thresholds.low)  return "collapsed";
+  return "hidden";
 }
 
-// ── Editor: typing → completion ──────────────────────────────────
-editor.addEventListener("input", (e) => {
-  // Skip the trigger logic for synthetic input events from accepts.
-  if (suppressNextInputTrigger) {
-    suppressNextInputTrigger = false;
-    updateHighlight();
-    updateGutter();
-    refreshCopyBtn();
-    saveSoon();
-    return;
-  }
-
-  lastInputType = (e.inputType || "").startsWith("delete") ? "delete" : "insert";
-
-  // Implicit rejection: user typed while a suggestion was visible.
-  if (currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
-    session.rejected.typed++;
-    updateSessionMetrics();
-  }
-
-  clearSuggestion();
-  clearTimeout(debounceTimer);
-  clearTimeout(retriggerTimer);
-  updateHighlight();
-  updateGutter();
-  refreshCopyBtn();
-  saveSoon();
-
-  const prefix = editor.value.slice(0, editor.selectionStart);
-  if (!prefix.trim())            { setAiState("idle"); return; }
-  if (lastInputType === "delete"){ setAiState("idle"); return; }
-  if (!selectionIsCollapsed())   { setAiState("idle"); return; }
-
-  scheduleCompletion(prefix);
-});
-
-editor.addEventListener("click", () => syncSuggestionVisibility());
-editor.addEventListener("keyup", (e) => {
-  if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Home","End","PageUp","PageDown"].includes(e.key)) {
-    syncSuggestionVisibility();
-  }
-});
-function syncSuggestionVisibility() {
-  if (!currentSuggestion) return;
-  if (!cursorIsAtPrefixEnd(currentSuggestion.prefix)) {
-    hideGhost();
-    hideFloating();
-    return;
-  }
-  if (currentSuggestion.ui_mode === "collapsed" || floatingCard.classList.contains("show")) {
-    positionFloatingCard();
-  }
-}
-
-// ── Bracket auto-close (smart pair, overstrike, backspace) ───────
-const PAIR_OPEN  = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'", "`": "`" };
-const PAIR_CLOSE = new Set([")","]","}",'"',"'","`"]);
-const QUOTES = new Set(['"',"'","`"]);
-
-function bracketKeydown(e) {
-  if (!settings.bracketAutoClose) return false;
-  const key = e.key;
-
-  // Smart skip: typing the same closing char that's already to the right → step over
-  if (PAIR_CLOSE.has(key) && selectionIsCollapsed()) {
-    if (editor.value[editor.selectionStart] === key) {
-      e.preventDefault();
-      const pos = editor.selectionStart + 1;
-      editor.setSelectionRange(pos, pos);
-      return true;
-    }
-  }
-
-  // Smart backspace: cursor between empty pair → delete both halves
-  if (key === "Backspace" && selectionIsCollapsed()) {
-    const prev = editor.value[editor.selectionStart - 1];
-    const next = editor.value[editor.selectionStart];
-    if (prev && PAIR_OPEN[prev] && PAIR_OPEN[prev] === next) {
-      e.preventDefault();
-      // Select both halves of the pair and delete in a single op (keeps undo stack)
-      const pos = editor.selectionStart;
-      editor.setSelectionRange(pos - 1, pos + 1);
-      document.execCommand("delete");
-      return true;
-    }
-  }
-
-  // Pair insert
-  if (PAIR_OPEN[key]) {
-    if (selectionIsCollapsed()) {
-      // For quote chars, don't pair when adjacent to a word character — that's
-      // typically string concatenation or a quote inside text, not a new pair.
-      if (QUOTES.has(key)) {
-        const before = editor.value[editor.selectionStart - 1];
-        const after  = editor.value[editor.selectionStart];
-        if ((before && /[\w]/.test(before)) || (after && /[\w]/.test(after))) return false;
-        // Skip-over for quotes (typing `"` inside `"hello "`)
-        if (after === key) {
-          e.preventDefault();
-          const pos = editor.selectionStart + 1;
-          editor.setSelectionRange(pos, pos);
-          return true;
-        }
-      }
-      e.preventDefault();
-      document.execCommand("insertText", false, key + PAIR_OPEN[key]);
-      const pos = editor.selectionStart - 1;
-      editor.setSelectionRange(pos, pos);
-      return true;
-    } else {
-      // Wrap selected text
-      const start = editor.selectionStart;
-      const end   = editor.selectionEnd;
-      const sel   = editor.value.slice(start, end);
-      e.preventDefault();
-      document.execCommand("insertText", false, key + sel + PAIR_OPEN[key]);
-      editor.setSelectionRange(start + 1, end + 1);
-      return true;
-    }
-  }
-
-  return false;
-}
-
-// ── Keyboard: Tab / Esc / Ctrl+→ / Alt+\ / brackets ──────────────
-editor.addEventListener("keydown", (e) => {
-  // Brackets first (mutates value, fires input → triggers our handlers)
-  if (bracketKeydown(e)) return;
-
-  // Alt+\: peek (expand floating card)
-  if (e.altKey && e.key === "\\" && currentSuggestion && !floatingCard.classList.contains("hidden")) {
-    e.preventDefault();
-    floatingCard.classList.toggle("expanded");
-    return;
-  }
-
-  // Ctrl+→: accept word
-  if ((e.ctrlKey || e.metaKey) && e.key === "ArrowRight" && currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
-    if (acceptWord()) {
-      e.preventDefault();
-      return;
-    }
-  }
-
-  // Tab: accept full
-  if (e.key === "Tab" && currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
-    e.preventDefault();
-    acceptFull();
-    return;
-  }
-
-  // Esc: dismiss
-  if (e.key === "Escape") {
-    if (currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
-      session.rejected.esc++;
-      updateSessionMetrics();
-    }
-    cancelPending();
-    clearSuggestion();
-    setAiState("idle");
-  }
-});
-
-// ── Insertion helpers (preserve native undo) ─────────────────────
-function insertText(text) {
-  // execCommand('insertText') keeps the browser undo/redo stack in sync.
-  // Falls back to direct value mutation if the browser refuses (rare).
-  if (!document.execCommand || !document.execCommand("insertText", false, text)) {
-    const start = editor.selectionStart;
-    const end   = editor.selectionEnd;
-    editor.value = editor.value.slice(0, start) + text + editor.value.slice(end);
-    const pos = start + text.length;
-    editor.setSelectionRange(pos, pos);
-    // Manually fire input so the rest of the pipeline (highlight, gutter…) updates
-    suppressNextInputTrigger = true;
-    editor.dispatchEvent(new Event("input", { bubbles: true }));
-  }
-}
-
-function acceptFull() {
-  if (!currentSuggestion) return;
-  const text = currentSuggestion.completion;
-  ghostSuggestion.classList.add("fade-out");
-  flashAccept();
-  session.accepted.full++;
-  updateSessionMetrics();
-
-  setTimeout(() => {
-    suppressNextInputTrigger = true;
-    insertText(text);
-    cancelPending();
-    clearSuggestion();
-    setAiState("idle");
-    saveSoon();
-    refreshCopyBtn();
-    updateGutter();
-    updateHighlight();
-    scheduleAutoRetrigger();
-  }, 90);
-}
-
-function acceptWord() {
-  if (!currentSuggestion) return false;
-  const text = currentSuggestion.completion;
-  const m = text.match(/^(\s*\S+|\s+)/);
-  if (!m) return false;
-  const piece = m[1];
-
-  suppressNextInputTrigger = true;
-  insertText(piece);
-  flashAccept();
-  session.accepted.word++;
-  updateSessionMetrics();
-
-  const remaining = text.slice(piece.length);
-  if (remaining.length === 0) {
-    cancelPending();
-    clearSuggestion();
-    setAiState("idle");
-    scheduleAutoRetrigger();
-  } else {
-    // Trim consumed chars off the leading tokens so heatmap stays accurate.
-    let consumed = piece.length;
-    const remainingTokens = [];
-    for (const t of currentSuggestion.tokens || []) {
-      if (consumed >= t.text.length) {
-        consumed -= t.text.length;
-        if (consumed === 0) continue;
-      } else if (consumed > 0) {
-        remainingTokens.push({ text: t.text.slice(consumed), logprob: t.logprob });
-        consumed = 0;
-      } else {
-        remainingTokens.push(t);
-      }
-    }
-    currentSuggestion.completion = remaining;
-    currentSuggestion.tokens = remainingTokens;
-    currentSuggestion.prefix = editor.value.slice(0, editor.selectionStart);
-    // Mark as "already counted" so re-render doesn't double-count `shown`.
-    renderSuggestion(currentSuggestion.prefix, currentSuggestion);
-  }
-  saveSoon();
-  refreshCopyBtn();
-  updateGutter();
-  updateHighlight();
-  return true;
-}
-
-function flashAccept() {
-  editorContent.classList.remove("accepted");
-  void editorContent.offsetWidth;
-  editorContent.classList.add("accepted");
-  setTimeout(() => editorContent.classList.remove("accepted"), 400);
-}
-
-// ── Auto-retrigger after accept ──────────────────────────────────
-function scheduleAutoRetrigger() {
-  clearTimeout(retriggerTimer);
-  if (!settings.autoRetrigger) return;
-  retriggerTimer = setTimeout(() => {
-    // Only fire if the user is still idle at the same caret position
-    if (currentSuggestion) return;        // a different suggestion already showed
-    if (!selectionIsCollapsed()) return;
-    const prefix = editor.value.slice(0, editor.selectionStart);
-    if (!prefix.trim()) return;
-    scheduleCompletion(prefix, { immediate: true });
-  }, RETRIGGER_DELAY_MS);
-}
-
-// ── Floating card click → expand / accept ────────────────────────
-floatingCard.addEventListener("mousedown", (e) => e.preventDefault());
-floatingMore.addEventListener("click", () => {
-  floatingCard.classList.toggle("expanded");
-  positionFloatingCard();
-});
-floatingBody.addEventListener("click", () => {
-  if (currentSuggestion) acceptFull();
-});
-
-// ── Threshold sliders ────────────────────────────────────────────
-function applyThresholds() {
-  let high = parseInt(highSlider.value, 10) / 100;
-  let low  = parseInt(lowSlider.value,  10) / 100;
-  if (low > high) {
-    if (document.activeElement === lowSlider) {
-      high = low;
-      highSlider.value = Math.round(high * 100);
-    } else {
-      low = high;
-      lowSlider.value = Math.round(low * 100);
-    }
-  }
-  thresholds = { high, low };
-  saveThresholds();
-  highVal.textContent = high.toFixed(2);
-  lowVal.textContent  = low.toFixed(2);
-  tickHigh.style.left = `${high * 100}%`;
-  tickLow.style.left  = `${low  * 100}%`;
-  if (currentSuggestion) {
-    renderSuggestion(currentSuggestion.prefix, currentSuggestion);
-  }
-}
-highSlider.addEventListener("input", applyThresholds);
-lowSlider.addEventListener("input",  applyThresholds);
-
-// ── Token hover tooltip ──────────────────────────────────────────
+// ─── Token-hover tooltip ────────────────────────────────────────────
 document.addEventListener("mouseover", (e) => {
   const t = e.target;
   if (!(t instanceof HTMLElement) || !t.classList.contains("tok")) return;
@@ -1847,157 +1201,36 @@ document.addEventListener("mouseover", (e) => {
 });
 document.addEventListener("mouseout", (e) => {
   const t = e.target;
-  if (t instanceof HTMLElement && t.classList.contains("tok")) {
-    tokTooltip.classList.remove("show");
-  }
+  if (t instanceof HTMLElement && t.classList.contains("tok")) tokTooltip.classList.remove("show");
 });
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[c]));
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
-// ── Copy / Clear ─────────────────────────────────────────────────
-copyBtn.addEventListener("click", async () => {
-  const code = editor.value;
-  if (!code) return;
-  try {
-    await navigator.clipboard.writeText(code);
-  } catch {
-    editor.select();
-    document.execCommand("copy");
-    editor.setSelectionRange(editor.value.length, editor.value.length);
+// ─── Threshold sliders ──────────────────────────────────────────────
+function applyThresholds() {
+  let high = parseInt(highSlider.value, 10) / 100;
+  let low  = parseInt(lowSlider.value,  10) / 100;
+  if (low > high) {
+    if (document.activeElement === lowSlider) {
+      high = low; highSlider.value = Math.round(high * 100);
+    } else {
+      low = high; lowSlider.value = Math.round(low * 100);
+    }
   }
-  const original = copyBtn.textContent;
-  copyBtn.textContent = "Copied!";
-  copyBtn.classList.add("copied");
-  setTimeout(() => {
-    copyBtn.textContent = original;
-    copyBtn.classList.remove("copied");
-  }, 1200);
-});
-function refreshCopyBtn() { copyBtn.disabled = editor.value.length === 0; }
-
-clearBtn.addEventListener("click", () => {
-  if (!editor.value) return;
-  if (!confirm("Clear the editor?")) return;
-  editor.value = "";
-  cancelPending();
-  clearSuggestion();
-  saveNow();
-  updateGutter();
-  updateHighlight();
-  refreshCopyBtn();
-  editor.focus();
-});
-
-// ── Editor focus ring ────────────────────────────────────────────
-editor.addEventListener("focus", () => editorContent.classList.add("focused"));
-editor.addEventListener("blur",  () => editorContent.classList.remove("focused"));
-
-// ── Scroll sync (gutter + ghost layer + highlight layer) ─────────
-editor.addEventListener("scroll", () => {
-  ghostLayer.scrollTop      = editor.scrollTop;
-  ghostLayer.scrollLeft     = editor.scrollLeft;
-  highlightLayer.scrollTop  = editor.scrollTop;
-  highlightLayer.scrollLeft = editor.scrollLeft;
-  gutter.scrollTop          = editor.scrollTop;
-  if (floatingCard.classList.contains("show")) positionFloatingCard();
-});
-
-// ── Line-number gutter ───────────────────────────────────────────
-function updateGutter() {
-  const lineCount = editor.value.split("\n").length || 1;
-  const lines = [];
-  for (let i = 1; i <= lineCount; i++) lines.push(i);
-  gutter.textContent = lines.join("\n");
+  thresholds = { high, low };
+  saveThresholds();
+  highVal.textContent = high.toFixed(2);
+  lowVal.textContent  = low.toFixed(2);
+  tickHigh.style.left = `${high * 100}%`;
+  tickLow.style.left  = `${low  * 100}%`;
+  if (currentSuggestion) renderSuggestion(currentSuggestion.prefix, currentSuggestion);
 }
+highSlider.addEventListener("input", applyThresholds);
+lowSlider.addEventListener("input",  applyThresholds);
 
-// ── Syntax highlighting ──────────────────────────────────────────
-const highlightAvailable = () => !window.__hljsFailed && typeof hljs !== "undefined";
-let lastHighlightedText = null;
-function updateHighlight() {
-  if (!highlightAvailable()) {
-    editorContent.classList.add("no-hl");
-    return;
-  }
-  const code = editor.value;
-  if (code === lastHighlightedText) return;
-  lastHighlightedText = code;
-  // Trailing newline trick: textarea handles a final blank line, but <pre>
-  // collapses the trailing \n. Add a sentinel so the layers stay aligned.
-  const padded = code.endsWith("\n") ? code + " " : code;
-  try {
-    highlightCode.innerHTML = hljs.highlight(padded, { language: "python", ignoreIllegals: true }).value;
-  } catch {
-    highlightCode.textContent = padded;
-  }
-}
-
-// ── Persistence (editor content) ─────────────────────────────────
-let saveTimer = null;
-function saveSoon() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveNow, 400);
-}
-function saveNow() {
-  try { localStorage.setItem(STORAGE_KEY, editor.value); } catch {}
-}
-function restore() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) editor.value = saved;
-  } catch {}
-}
-window.addEventListener("beforeunload", saveNow);
-
-// ── Window resize ────────────────────────────────────────────────
-window.addEventListener("resize", () => {
-  if (floatingCard.classList.contains("show")) positionFloatingCard();
-});
-
-// ── Resizable side panel ─────────────────────────────────────────
-let dragging = false, dragStartX = 0, dragStartW = 0;
-function currentSideWidth() {
-  const v = getComputedStyle(document.documentElement).getPropertyValue("--side-width").trim();
-  return parseInt(v, 10) || 340;
-}
-function setSideWidth(w) {
-  w = Math.max(0, Math.min(720, w));
-  document.documentElement.style.setProperty("--side-width", w + "px");
-  try { localStorage.setItem(SIDE_WIDTH_KEY, String(w)); } catch {}
-  if (floatingCard.classList.contains("show")) positionFloatingCard();
-}
-resizeHandle.addEventListener("mousedown", (e) => {
-  dragging = true;
-  dragStartX = e.clientX;
-  dragStartW = currentSideWidth();
-  resizeHandle.classList.add("dragging");
-  document.body.style.cursor = "col-resize";
-  document.body.style.userSelect = "none";
-  e.preventDefault();
-});
-document.addEventListener("mousemove", (e) => {
-  if (!dragging) return;
-  const dx = dragStartX - e.clientX;  // drag left → side wider
-  setSideWidth(dragStartW + dx);
-});
-document.addEventListener("mouseup", () => {
-  if (!dragging) return;
-  dragging = false;
-  resizeHandle.classList.remove("dragging");
-  document.body.style.cursor = "";
-  document.body.style.userSelect = "";
-});
-let lastSideWidth = 340;
-resizeHandle.addEventListener("dblclick", () => {
-  const w = currentSideWidth();
-  if (w > 8) { lastSideWidth = w; setSideWidth(0); }
-  else       { setSideWidth(lastSideWidth || 340); }
-});
-
-// ── Settings drawer ──────────────────────────────────────────────
-function openDrawer() {
+// ─── Settings drawer ────────────────────────────────────────────────
+function openDrawer()  {
   settingsDrawer.classList.add("show");
   drawerBackdrop.classList.add("show");
   settingsDrawer.setAttribute("aria-hidden", "false");
@@ -2006,7 +1239,7 @@ function closeDrawer() {
   settingsDrawer.classList.remove("show");
   drawerBackdrop.classList.remove("show");
   settingsDrawer.setAttribute("aria-hidden", "true");
-  editor.focus();
+  if (editor) editor.focus();
 }
 settingsBtn.addEventListener("click", openDrawer);
 settingsClose.addEventListener("click", closeDrawer);
@@ -2024,7 +1257,6 @@ function reflectSettingsToUI() {
   setMaxtok.value = settings.maxNewTokens;
   setMaxtokVal.textContent = String(settings.maxNewTokens);
   setRetrigger.checked = settings.autoRetrigger;
-  setBrackets.checked = settings.bracketAutoClose;
 }
 setDebounce.addEventListener("input", () => {
   settings.debounceMs = parseInt(setDebounce.value, 10);
@@ -2040,34 +1272,77 @@ setRetrigger.addEventListener("change", () => {
   settings.autoRetrigger = setRetrigger.checked;
   saveSettings();
 });
-setBrackets.addEventListener("change", () => {
-  settings.bracketAutoClose = setBrackets.checked;
-  saveSettings();
+
+// ─── Resizable side panel ───────────────────────────────────────────
+let dragging = false, dragStartX = 0, dragStartW = 0;
+function currentSideWidth() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue("--side-width").trim();
+  return parseInt(v, 10) || 340;
+}
+function setSideWidth(w) {
+  w = Math.max(0, Math.min(720, w));
+  document.documentElement.style.setProperty("--side-width", w + "px");
+  try { localStorage.setItem(SIDE_WIDTH_KEY, String(w)); } catch {}
+  if (editor) editor.layout();
+}
+resizeHandle.addEventListener("mousedown", (e) => {
+  dragging = true;
+  dragStartX = e.clientX;
+  dragStartW = currentSideWidth();
+  resizeHandle.classList.add("dragging");
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+  e.preventDefault();
+});
+document.addEventListener("mousemove", (e) => {
+  if (!dragging) return;
+  const dx = dragStartX - e.clientX;
+  setSideWidth(dragStartW + dx);
+});
+document.addEventListener("mouseup", () => {
+  if (!dragging) return;
+  dragging = false;
+  resizeHandle.classList.remove("dragging");
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+});
+let lastSideWidth = 340;
+resizeHandle.addEventListener("dblclick", () => {
+  const w = currentSideWidth();
+  if (w > 8) { lastSideWidth = w; setSideWidth(0); }
+  else       { setSideWidth(lastSideWidth || 340); }
 });
 
-// ── Session metrics ──────────────────────────────────────────────
-function updateSessionMetrics() {
+// ─── Session metrics ────────────────────────────────────────────────
+function bump(el) {
+  el.classList.remove("bump");
+  void el.offsetWidth;
+  el.classList.add("bump");
+}
+function updateSessionMetrics(bumpKeys = []) {
   const shownTotal = session.shown.inline + session.shown.collapsed + session.shown.hidden;
   const acceptedTotal = session.accepted.full + session.accepted.word;
   const rejectedTotal = session.rejected.esc + session.rejected.typed;
-  const visibleShown = session.shown.inline + session.shown.collapsed;  // hidden = suppressed, not "shown" interactively
+  const visibleShown = session.shown.inline + session.shown.collapsed;
 
-  mShown.textContent          = shownTotal;
-  mShownInline.textContent    = session.shown.inline;
-  mShownCollapsed.textContent = session.shown.collapsed;
-  mShownHidden.textContent    = session.shown.hidden;
-  mAccepted.textContent       = acceptedTotal;
-  mAcceptedFull.textContent   = session.accepted.full;
-  mAcceptedWord.textContent   = session.accepted.word;
-  mRejected.textContent       = rejectedTotal;
-  mRejectedEsc.textContent    = session.rejected.esc;
-  mRejectedTyped.textContent  = session.rejected.typed;
+  const update = (el, n, key) => {
+    el.textContent = n;
+    if (bumpKeys.includes(key)) bump(el);
+  };
 
-  if (visibleShown > 0) {
-    mRate.textContent = `${((acceptedTotal / visibleShown) * 100).toFixed(0)}%`;
-  } else {
-    mRate.textContent = "—";
-  }
+  update(mShown,           shownTotal,                 "shown");
+  update(mShownInline,     session.shown.inline,       "shown.inline");
+  update(mShownCollapsed,  session.shown.collapsed,    "shown.collapsed");
+  update(mShownHidden,     session.shown.hidden,       "shown.hidden");
+  update(mAccepted,        acceptedTotal,              "accepted");
+  update(mAcceptedFull,    session.accepted.full,      "accepted.full");
+  update(mAcceptedWord,    session.accepted.word,      "accepted.word");
+  update(mRejected,        rejectedTotal,              "rejected");
+  update(mRejectedEsc,     session.rejected.esc,       "rejected.esc");
+  update(mRejectedTyped,   session.rejected.typed,     "rejected.typed");
+
+  if (visibleShown > 0) mRate.textContent = `${((acceptedTotal / visibleShown) * 100).toFixed(0)}%`;
+  else                  mRate.textContent = "—";
 }
 function updateSessionElapsed() {
   const sec = Math.floor((Date.now() - session.startTime) / 1000);
@@ -2076,7 +1351,6 @@ function updateSessionElapsed() {
   sessionElapsed.textContent = `${mm}:${ss}`;
 }
 setInterval(updateSessionElapsed, 1000);
-
 resetSessionBtn.addEventListener("click", () => {
   session.startTime = Date.now();
   session.shown    = { inline: 0, collapsed: 0, hidden: 0 };
@@ -2086,25 +1360,674 @@ resetSessionBtn.addEventListener("click", () => {
   updateSessionElapsed();
 });
 
-// ── Init ─────────────────────────────────────────────────────────
+// ─── Init non-Monaco UI ─────────────────────────────────────────────
 loadSettings();
 reflectSettingsToUI();
-// Reflect persisted thresholds into sliders (not just defaults)
 highSlider.value = Math.round(thresholds.high * 100);
 lowSlider.value  = Math.round(thresholds.low  * 100);
-
-restore();
 applyThresholds();
-updateGutter();
-updateHighlight();
-refreshCopyBtn();
 updateSessionMetrics();
 updateSessionElapsed();
 
-// If hljs failed at parse time, mark the editor so text is shown directly.
-if (!highlightAvailable()) editorContent.classList.add("no-hl");
+// ════════════════════════════════════════════════════════════════════
+//  Monaco-dependent code below (initialised after AMD loader fires)
+// ════════════════════════════════════════════════════════════════════
 
-editor.focus();
+if (window.__monacoFailed || typeof require === "undefined") {
+  monacoContainer.classList.remove("loading");
+  monacoContainer.classList.add("error");
+} else {
+  require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs" } });
+  require(["vs/editor/editor.main"], initMonaco, () => {
+    monacoContainer.classList.remove("loading");
+    monacoContainer.classList.add("error");
+  });
+}
+
+function initMonaco() {
+  monacoContainer.classList.remove("loading");
+
+  // ─── Refined macOS-dark / Dracula-ish theme ────────────────────
+  monaco.editor.defineTheme("macos-dark", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "",                 foreground: "ebebf0" },
+      { token: "comment",          foreground: "6272a4", fontStyle: "italic" },
+      { token: "string",           foreground: "f1fa8c" },
+      { token: "string.escape",    foreground: "ffb86c" },
+      { token: "number",           foreground: "bd93f9" },
+      { token: "constant",         foreground: "bd93f9" },
+      { token: "constant.numeric", foreground: "bd93f9" },
+      { token: "keyword",          foreground: "ff79c6", fontStyle: "bold" },
+      { token: "keyword.flow",     foreground: "ff79c6", fontStyle: "bold" },
+      { token: "operator",         foreground: "ff79c6" },
+      { token: "delimiter",        foreground: "9aa0aa" },
+      { token: "delimiter.parenthesis", foreground: "9aa0aa" },
+      { token: "delimiter.square", foreground: "9aa0aa" },
+      { token: "delimiter.curly",  foreground: "9aa0aa" },
+      { token: "type",             foreground: "8be9fd" },
+      { token: "type.identifier",  foreground: "8be9fd" },
+      { token: "identifier",       foreground: "ebebf0" },
+      { token: "function",         foreground: "50fa7b" },
+      { token: "function.call",    foreground: "50fa7b" },
+      { token: "variable",         foreground: "ebebf0" },
+      { token: "variable.parameter",foreground:"ffb86c" },
+      { token: "variable.predefined", foreground: "bd93f9", fontStyle: "italic" },
+      { token: "tag",              foreground: "ff79c6" },
+      { token: "attribute.name",   foreground: "50fa7b" },
+      { token: "attribute.value",  foreground: "f1fa8c" },
+      // Python-specific
+      { token: "decorator",        foreground: "ffb86c" },
+      { token: "meta.python",      foreground: "ffb86c" },
+      { token: "support.function.builtin.python", foreground: "8be9fd" },
+      { token: "support.type.python",              foreground: "8be9fd" },
+    ],
+    colors: {
+      "editor.background":            "#1c1c1e",
+      "editor.foreground":            "#ebebf0",
+      "editor.lineHighlightBackground":"#ffffff08",
+      "editor.lineHighlightBorder":   "#00000000",
+      "editorLineNumber.foreground":  "#5e5e62",
+      "editorLineNumber.activeForeground": "#a0a0a0",
+      "editorCursor.foreground":      "#0a84ff",
+      "editor.selectionBackground":   "#0a84ff4d",
+      "editor.inactiveSelectionBackground": "#0a84ff26",
+      "editor.findMatchBackground":   "#ffd60a40",
+      "editor.findMatchHighlightBackground": "#ffd60a26",
+      "editorIndentGuide.background1":"#ffffff10",
+      "editorIndentGuide.activeBackground1": "#ffffff22",
+      "editorBracketMatch.background":"#0a84ff30",
+      "editorBracketMatch.border":    "#0a84ff80",
+      "editorWhitespace.foreground":  "#ffffff14",
+      "scrollbar.shadow":             "#00000000",
+      "scrollbarSlider.background":   "#ffffff20",
+      "scrollbarSlider.hoverBackground":"#ffffff30",
+      "scrollbarSlider.activeBackground":"#ffffff40",
+      // Inline (ghost) suggestion colour — soft, low-key
+      "editorGhostText.foreground":   "#ffffff52",
+      "editorGhostText.background":   "#00000000",
+      // Bracket-pair colourisation palette (warm-cool alternation)
+      "editorBracketHighlight.foreground1": "#ff79c6",
+      "editorBracketHighlight.foreground2": "#8be9fd",
+      "editorBracketHighlight.foreground3": "#ffb86c",
+      "editorBracketHighlight.foreground4": "#bd93f9",
+      "editorBracketHighlight.unexpectedBracket.foreground": "#ff453a",
+      // Widget surfaces (autocomplete, hover, etc.)
+      "editorWidget.background":      "#2c2c2e",
+      "editorWidget.border":          "#ffffff14",
+      "editorSuggestWidget.background":"#2c2c2e",
+      "editorSuggestWidget.border":   "#ffffff14",
+      "editorSuggestWidget.selectedBackground":"#0a84ff40",
+      "editorOverviewRuler.border":   "#00000000",
+      "focusBorder":                  "#0a84ff80",
+    },
+  });
+
+  // ─── Editor instance ───────────────────────────────────────────
+  let initialValue = "";
+  try { initialValue = localStorage.getItem(STORAGE_KEY) || ""; } catch {}
+
+  editor = monaco.editor.create(monacoContainer, {
+    value: initialValue,
+    language: "python",
+    theme: "macos-dark",
+    fontFamily: '"SF Mono", ui-monospace, "Menlo", "Monaco", monospace',
+    fontSize: 14,
+    lineHeight: 22,
+    fontLigatures: true,
+    letterSpacing: 0.2,
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+    wordWrap: "off",
+    tabSize: 4,
+    insertSpaces: true,
+    detectIndentation: false,
+    bracketPairColorization: { enabled: true },
+    renderLineHighlight: "all",
+    cursorBlinking: "expand",
+    cursorSmoothCaretAnimation: "on",
+    smoothScrolling: true,
+    automaticLayout: true,
+    inlineSuggest: { enabled: true, mode: "subwordSmart" },
+    quickSuggestions: false,
+    suggestOnTriggerCharacters: false,
+    acceptSuggestionOnEnter: "off",
+    parameterHints: { enabled: false },
+    hover: { enabled: false },
+    codeLens: false,
+    folding: true,
+    links: false,
+    contextmenu: false,
+    padding: { top: 16, bottom: 16 },
+    autoClosingBrackets: "always",
+    autoClosingQuotes: "always",
+    autoSurround: "languageDefined",
+  });
+  model = editor.getModel();
+
+  // ─── Inline completions provider (push-based via pendingCompletion) ──
+  monaco.languages.registerInlineCompletionsProvider("python", {
+    provideInlineCompletions: (model_, position, context, token) => {
+      if (!pendingCompletion) return { items: [] };
+      // Verify the prefix in the editor matches what we asked for
+      const offset = model_.getOffsetAt(position);
+      const prefix = model_.getValue().substring(0, offset);
+      if (prefix !== pendingCompletionPrefix) return { items: [] };
+      return {
+        items: [{
+          insertText: pendingCompletion.completion,
+          range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column),
+        }],
+      };
+    },
+    handleItemDidShow: () => { /* metric handled in renderSuggestion */ },
+    handlePartialAccept: () => {
+      session.accepted.word++;
+      updateSessionMetrics(["accepted","accepted.word"]);
+      // Defer cleanup to next tick so it doesn't fight Monaco's internal
+      // commit machinery; then schedule auto-retrigger.
+      setTimeout(() => {
+        cancelPending();
+        clearSuggestion();
+        setAiState("idle");
+        scheduleAutoRetrigger();
+      }, 0);
+    },
+    freeInlineCompletions: () => {},
+  });
+
+  // ─── Floating card as Monaco content widget (medium tier) ──────
+  floatingCardEl.style.display = "";  // unhide; visibility handled by .show class
+  floatingWidget = {
+    domNode: floatingCardEl,
+    position: null,
+    suppressMouseDown: false,
+    allowEditorOverflow: true,
+    getId: () => "ai-suggestion-card",
+    getDomNode: function() { return this.domNode; },
+    getPosition: function() { return this.position; },
+  };
+  editor.addContentWidget(floatingWidget);
+
+  // ─── Editor events ─────────────────────────────────────────────
+  let suppressNextChange = false;
+
+  model.onDidChangeContent((e) => {
+    saveSoon();
+    refreshCopyBtn();
+
+    if (suppressNextChange) {
+      suppressNextChange = false;
+      return;
+    }
+
+    const isDelete = e.changes.some(c => c.text === "" && c.rangeLength > 0);
+
+    // Implicit rejection
+    if (currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
+      session.rejected.typed++;
+      updateSessionMetrics(["rejected","rejected.typed"]);
+    }
+
+    clearSuggestion();
+    clearTimeout(debounceTimer);
+    clearTimeout(retriggerTimer);
+
+    const pos = editor.getPosition();
+    const offset = model.getOffsetAt(pos);
+    const prefix = model.getValue().substring(0, offset);
+
+    if (!prefix.trim())                  { setAiState("idle"); return; }
+    if (isDelete)                        { setAiState("idle"); return; }
+    if (!selectionIsCollapsed())         { setAiState("idle"); return; }
+
+    scheduleCompletion(prefix);
+  });
+
+  editor.onDidChangeCursorPosition(() => syncSuggestionVisibility());
+  editor.onDidFocusEditorText(() => editorPane.classList.add("focused"));
+  editor.onDidBlurEditorText(() => editorPane.classList.remove("focused"));
+
+  // ─── Keybindings ───────────────────────────────────────────────
+  // Tab: handled by Monaco (commits inline suggestion if showing, else inserts indent)
+  // Esc: handled by Monaco for suggestion dismiss; we track metric via a key event listener
+  editor.onKeyDown((e) => {
+    if (e.code === "Escape") {
+      if (currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
+        session.rejected.esc++;
+        updateSessionMetrics(["rejected","rejected.esc"]);
+      }
+      cancelPending();
+      clearSuggestion();
+      setAiState("idle");
+    }
+  });
+
+  // Ctrl/Cmd+→: accept next word from suggestion (works for both inline ghost
+  // and floating card). Falls through to cursor-word-right if no suggestion.
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.RightArrow, () => {
+    if (pendingCompletion && currentSuggestion) {
+      // Inline ghost path — Monaco handles partial accept natively
+      suppressNextChange = true;
+      editor.trigger("manual", "editor.action.inlineSuggest.acceptNextWord", null);
+    } else if (currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
+      // Floating-card path — manual word accept
+      acceptWordFromFloating();
+    } else {
+      editor.trigger("manual", "cursorWordEndRight", null);
+    }
+  });
+
+  // Alt+\: toggle peek on floating card (collapsed tier)
+  editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.Backslash, () => {
+    if (currentSuggestion && currentSuggestion.ui_mode === "collapsed") {
+      floatingCardEl.classList.toggle("expanded");
+      editor.layoutContentWidget(floatingWidget);
+    }
+  });
+
+  // ─── Tab as accept-full (covers it as an explicit handler, also tracks metric) ──
+  // Monaco's built-in commits via `editor.action.inlineSuggest.commit` on Tab when
+  // the inline suggestion is visible. We piggyback by listening to model edits for
+  // metric tracking; the actual commit is handled by Monaco.
+  // Fallback in case Monaco's binding doesn't fire (e.g. ghost not yet shown):
+  editor.addCommand(monaco.KeyCode.Tab, () => {
+    // Discriminator: pendingCompletion === true means Monaco's inline ghost is
+    // visible. Anything else with a currentSuggestion means the floating card
+    // is the active surface (collapsed tier, or inline tier downgraded because
+    // the cursor isn't at end of line).
+    if (pendingCompletion && currentSuggestion) {
+      suppressNextChange = true;
+      session.accepted.full++;
+      updateSessionMetrics(["accepted","accepted.full"]);
+      flashAccept();
+      editor.trigger("manual", "editor.action.inlineSuggest.commit", null);
+      cancelPending();
+      clearSuggestion();
+      setAiState("idle");
+      scheduleAutoRetrigger();
+    } else if (currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
+      acceptFromFloating();
+    } else {
+      // No suggestion — insert indent (4 spaces, Python convention)
+      const sel = editor.getSelection();
+      editor.executeEdits("tab-indent", [{
+        range: sel,
+        text: "    ",
+        forceMoveMarkers: true,
+      }]);
+    }
+  }, "");  // empty context = always
+
+  // ─── Floating-card click handlers ──────────────────────────────
+  floatingCardEl.addEventListener("mousedown", (e) => e.preventDefault());
+  floatingMore.addEventListener("click", () => {
+    floatingCardEl.classList.toggle("expanded");
+    editor.layoutContentWidget(floatingWidget);
+  });
+  floatingBody.addEventListener("click", () => {
+    if (currentSuggestion && currentSuggestion.ui_mode === "collapsed") acceptFromFloating();
+  });
+
+  // ─── Clear / Copy ──────────────────────────────────────────────
+  copyBtn.addEventListener("click", async () => {
+    const code = editor.getValue();
+    if (!code) return;
+    try { await navigator.clipboard.writeText(code); } catch {}
+    const original = copyBtn.textContent;
+    copyBtn.textContent = "Copied!";
+    copyBtn.classList.add("copied");
+    setTimeout(() => { copyBtn.textContent = original; copyBtn.classList.remove("copied"); }, 1200);
+  });
+  clearBtn.addEventListener("click", () => {
+    if (!editor.getValue()) return;
+    if (!confirm("Clear the editor?")) return;
+    editor.setValue("");
+    cancelPending();
+    clearSuggestion();
+    saveNow();
+    refreshCopyBtn();
+    editor.focus();
+  });
+
+  // ─── Persistence ───────────────────────────────────────────────
+  let saveTimer = null;
+  function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 400); }
+  function saveNow()  { try { localStorage.setItem(STORAGE_KEY, editor.getValue()); } catch {} }
+  window.addEventListener("beforeunload", saveNow);
+
+  refreshCopyBtn();
+  editor.focus();
+
+  // ─── Helpers (Monaco-scoped) ───────────────────────────────────
+  function refreshCopyBtn() { copyBtn.disabled = editor.getValue().length === 0; }
+
+  function selectionIsCollapsed() {
+    const s = editor.getSelection();
+    return s.startLineNumber === s.endLineNumber && s.startColumn === s.endColumn;
+  }
+
+  function cursorIsAtEndOfLine() {
+    const pos = editor.getPosition();
+    const lineLen = model.getLineLength(pos.lineNumber);
+    if (pos.column - 1 >= lineLen) return true;
+    const tail = model.getLineContent(pos.lineNumber).slice(pos.column - 1);
+    return /^\s*$/.test(tail);
+  }
+
+  function getCurrentPrefix() {
+    const offset = model.getOffsetAt(editor.getPosition());
+    return model.getValue().substring(0, offset);
+  }
+
+  // ─── Trigger logic ─────────────────────────────────────────────
+  // When the user types ahead of the in-flight request, we may still be able
+  // to use the completion if their extra characters happen to be the start of
+  // the suggested completion (Copilot-style: user "types into" the suggestion).
+  // Trim the consumed leading chars and re-anchor.
+  function trimTokensByChars(tokens, n) {
+    let consumed = n;
+    const out = [];
+    for (const t of tokens || []) {
+      if (consumed >= t.text.length) {
+        consumed -= t.text.length;
+        if (consumed === 0) continue;
+      } else if (consumed > 0) {
+        out.push({ text: t.text.slice(consumed), logprob: t.logprob });
+        consumed = 0;
+      } else {
+        out.push(t);
+      }
+    }
+    return out;
+  }
+
+  function reconcileResult(requestPrefix, currentPrefix, result) {
+    if (currentPrefix === requestPrefix) {
+      return { prefix: requestPrefix, result };
+    }
+    // User typed extra chars after the request fired. Try to re-anchor.
+    if (currentPrefix.startsWith(requestPrefix) && result && result.completion) {
+      const extra = currentPrefix.substring(requestPrefix.length);
+      if (result.completion.startsWith(extra)) {
+        const trimmedCompletion = result.completion.substring(extra.length);
+        if (!trimmedCompletion) return null;  // user fully "typed" the suggestion
+        return {
+          prefix: currentPrefix,
+          result: {
+            ...result,
+            completion: trimmedCompletion,
+            tokens: trimTokensByChars(result.tokens, extra.length),
+          },
+        };
+      }
+    }
+    return null;
+  }
+
+  function scheduleCompletion(prefix, { immediate = false } = {}) {
+    clearTimeout(debounceTimer);
+    if (!prefix.trim()) { setAiState("idle"); return; }
+    const cached = cacheGet(prefix);
+    if (cached) {
+      renderSuggestion(prefix, cached);
+      setAiState("ready");
+      return;
+    }
+    if (!immediate) setAiState("thinking");
+
+    const fire = async () => {
+      setAiState("generating");
+      try {
+        const result = await requestCompletion(prefix);
+        const reconciled = reconcileResult(prefix, getCurrentPrefix(), result);
+        if (reconciled) {
+          renderSuggestion(reconciled.prefix, reconciled.result);
+          setAiState("ready");
+        } else {
+          setAiState("idle");
+        }
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        console.error(err);
+        setAiState("error", describeError(err));
+      }
+    };
+    if (immediate) fire();
+    else           debounceTimer = setTimeout(fire, settings.debounceMs);
+  }
+
+  function scheduleAutoRetrigger() {
+    clearTimeout(retriggerTimer);
+    if (!settings.autoRetrigger) return;
+    retriggerTimer = setTimeout(() => {
+      if (currentSuggestion) return;
+      if (!selectionIsCollapsed()) return;
+      const prefix = getCurrentPrefix();
+      if (!prefix.trim()) return;
+      scheduleCompletion(prefix, { immediate: true });
+    }, RETRIGGER_DELAY_MS);
+  }
+
+  // ─── Render the three UI tiers ─────────────────────────────────
+  function renderSuggestion(prefix, s) {
+    if (!s || !s.completion) { clearSuggestion(); return; }
+    const wasNew = !s._shown;
+    s = { ...s, prefix };
+    currentSuggestion = s;
+
+    const { completion, confidence, tokens } = s;
+    const tokenList = Array.isArray(tokens) ? tokens : [];
+    const ui_mode = uiModeFor(confidence);
+    s.ui_mode = ui_mode;
+
+    if (wasNew) {
+      s._shown = true;
+      session.shown[ui_mode]++;
+      updateSessionMetrics(["shown", `shown.${ui_mode}`]);
+    }
+
+    confidenceNum.textContent = `${(confidence * 100).toFixed(1)}%`;
+    meterFill.style.width = `${Math.min(confidence * 100, 100)}%`;
+    meterFill.className = `meter-fill ${ui_mode}`;
+    // Mode badge with subtle bump animation when changing
+    const prevMode = modeBadge.textContent;
+    modeBadge.textContent = ui_mode;
+    modeBadge.className = `mode-badge ${ui_mode}`;
+    if (prevMode !== ui_mode) {
+      modeBadge.classList.add("bump");
+      setTimeout(() => modeBadge.classList.remove("bump"), 380);
+    }
+
+    if (ui_mode === "hidden") {
+      suggestionBox.textContent = "Suppressed (confidence below threshold).";
+      suggestionBox.className = "suggestion-box empty";
+      hideGhost();
+      hideFloating();
+      return;
+    }
+
+    suggestionBox.className = "suggestion-box";
+    if (tokenList.length > 0) suggestionBox.replaceChildren(buildTokenSpans(tokenList));
+    else                      suggestionBox.textContent = completion;
+
+    // High confidence + cursor at EOL → Monaco's native ghost text
+    if (ui_mode === "inline" && cursorIsAtEndOfLine()) {
+      hideFloating();
+      showGhost(prefix, completion);
+    } else {
+      hideGhost();
+      showFloating(completion, tokenList);
+    }
+  }
+
+  function showGhost(prefix, completion) {
+    pendingCompletion = { completion };
+    pendingCompletionPrefix = prefix;
+    // Ask Monaco to fetch from our provider
+    editor.trigger("manual", "editor.action.inlineSuggest.trigger", null);
+  }
+  function hideGhost() {
+    pendingCompletion = null;
+    pendingCompletionPrefix = null;
+    editor.trigger("manual", "editor.action.inlineSuggest.hide", null);
+  }
+
+  function showFloating(completion, tokens) {
+    floatingCardEl.style.display = "";
+    if (tokens.length > 0) floatingBody.replaceChildren(buildTokenSpans(tokens));
+    else                   floatingBody.textContent = completion;
+    const lines = completion.split("\n");
+    if (lines.length > 1) {
+      floatingMore.textContent = `▾ +${lines.length - 1} more line${lines.length > 2 ? "s" : ""} · Alt+\\ to expand`;
+      floatingMore.style.display = "block";
+    } else {
+      floatingMore.style.display = "none";
+    }
+    const pos = editor.getPosition();
+    floatingWidget.position = {
+      position: { lineNumber: pos.lineNumber, column: pos.column },
+      preference: [
+        monaco.editor.ContentWidgetPositionPreference.BELOW,
+        monaco.editor.ContentWidgetPositionPreference.ABOVE,
+      ],
+    };
+    editor.layoutContentWidget(floatingWidget);
+    requestAnimationFrame(() => floatingCardEl.classList.add("show"));
+  }
+  function hideFloating() {
+    floatingCardEl.classList.remove("show", "expanded");
+    setTimeout(() => {
+      if (!floatingCardEl.classList.contains("show")) {
+        floatingWidget.position = null;
+        if (editor) editor.layoutContentWidget(floatingWidget);
+      }
+    }, 220);
+  }
+
+  function clearSuggestion() {
+    currentSuggestion = null;
+    hideGhost();
+    hideFloating();
+    confidenceNum.textContent = "—";
+    meterFill.style.width = "0%";
+    meterFill.className = "meter-fill";
+    modeBadge.textContent = "—";
+    modeBadge.className = "mode-badge";
+    suggestionBox.textContent = "No suggestion yet.";
+    suggestionBox.className = "suggestion-box empty";
+  }
+
+  function syncSuggestionVisibility() {
+    if (!currentSuggestion) return;
+    if (getCurrentPrefix() !== currentSuggestion.prefix) {
+      hideGhost();
+      hideFloating();
+      return;
+    }
+    if (currentSuggestion.ui_mode === "collapsed" && floatingWidget.position) {
+      const pos = editor.getPosition();
+      floatingWidget.position = {
+        position: { lineNumber: pos.lineNumber, column: pos.column },
+        preference: [
+          monaco.editor.ContentWidgetPositionPreference.BELOW,
+          monaco.editor.ContentWidgetPositionPreference.ABOVE,
+        ],
+      };
+      editor.layoutContentWidget(floatingWidget);
+    }
+  }
+
+  function acceptFromFloating() {
+    if (!currentSuggestion) return;
+    const text = currentSuggestion.completion;
+    suppressNextChange = true;
+    const sel = editor.getSelection();
+    editor.executeEdits("ai-accept", [{
+      range: new monaco.Range(sel.endLineNumber, sel.endColumn, sel.endLineNumber, sel.endColumn),
+      text: text,
+      forceMoveMarkers: true,
+    }]);
+    session.accepted.full++;
+    updateSessionMetrics(["accepted","accepted.full"]);
+    flashAccept();
+    cancelPending();
+    clearSuggestion();
+    setAiState("idle");
+    refreshCopyBtn();
+    scheduleAutoRetrigger();
+    editor.focus();
+  }
+
+  function acceptWordFromFloating() {
+    if (!currentSuggestion) return;
+    const text = currentSuggestion.completion;
+    const m = text.match(/^(\s*\S+|\s+)/);
+    if (!m) return;
+    const piece = m[1];
+
+    suppressNextChange = true;
+    const sel = editor.getSelection();
+    editor.executeEdits("ai-accept-word", [{
+      range: new monaco.Range(sel.endLineNumber, sel.endColumn, sel.endLineNumber, sel.endColumn),
+      text: piece,
+      forceMoveMarkers: true,
+    }]);
+    session.accepted.word++;
+    updateSessionMetrics(["accepted","accepted.word"]);
+    flashAccept();
+
+    const remaining = text.slice(piece.length);
+    if (remaining.length === 0) {
+      cancelPending();
+      clearSuggestion();
+      setAiState("idle");
+      scheduleAutoRetrigger();
+    } else {
+      // Trim consumed chars off leading tokens so the heatmap stays accurate
+      let consumed = piece.length;
+      const remainingTokens = [];
+      for (const t of currentSuggestion.tokens || []) {
+        if (consumed >= t.text.length) {
+          consumed -= t.text.length;
+          if (consumed === 0) continue;
+        } else if (consumed > 0) {
+          remainingTokens.push({ text: t.text.slice(consumed), logprob: t.logprob });
+          consumed = 0;
+        } else {
+          remainingTokens.push(t);
+        }
+      }
+      currentSuggestion.completion = remaining;
+      currentSuggestion.tokens = remainingTokens;
+      currentSuggestion.prefix = (() => {
+        const offset = model.getOffsetAt(editor.getPosition());
+        return model.getValue().substring(0, offset);
+      })();
+      // Re-render keeps it in collapsed/inline tier without re-counting "shown"
+      renderSuggestion(currentSuggestion.prefix, currentSuggestion);
+    }
+    refreshCopyBtn();
+  }
+
+  function flashAccept() {
+    editorPane.classList.remove("accepted");
+    void editorPane.offsetWidth;
+    editorPane.classList.add("accepted");
+    setTimeout(() => editorPane.classList.remove("accepted"), 400);
+  }
+
+  // Expose for outer code (threshold-slider re-render)
+  window.__renderSuggestion = renderSuggestion;
+}
+
+// applyThresholds re-renders the current suggestion through whatever
+// renderSuggestion is in scope. We kept it global by attaching to window
+// in initMonaco; bridge it for the slider handler:
+function renderSuggestion(prefix, s) {
+  if (window.__renderSuggestion) window.__renderSuggestion(prefix, s);
+}
 </script>
 </body>
 </html>
