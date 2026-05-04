@@ -22,12 +22,15 @@
     --red:          #ff453a;
     --gray:         #8e8e93;
 
-    /* Editor metrics — keep ghost layer + gutter perfectly aligned */
+    /* Editor metrics — keep ghost layer + gutter + highlight layer aligned */
     --code-font:    "SF Mono", ui-monospace, "Menlo", "Monaco", monospace;
     --code-size:    14px;
     --code-line:    1.55;
     --pad-y:        24px;
     --pad-x:        28px;
+
+    /* Side panel width (resizable) */
+    --side-width:   340px;
   }
 
   * { box-sizing: border-box; }
@@ -42,6 +45,7 @@
     flex-direction: column;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overflow: hidden;
   }
 
   /* ── Header ───────────────────────────────────────────────── */
@@ -124,13 +128,37 @@
     background: var(--green) !important;
     color: #fff !important;
   }
+  button.icon {
+    padding: 6px 8px;
+    background: rgba(255,255,255,0.10);
+    color: var(--text-1);
+    line-height: 1;
+  }
+  button.icon:hover { background: rgba(255,255,255,0.16); }
 
   /* ── Layout ───────────────────────────────────────────────── */
   main {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 340px;
+    grid-template-columns: 1fr 5px var(--side-width);
     overflow: hidden;
+  }
+
+  /* Drag handle between editor and side pane */
+  .resize-handle {
+    background: var(--separator);
+    cursor: col-resize;
+    position: relative;
+    transition: background 140ms;
+  }
+  .resize-handle:hover,
+  .resize-handle.dragging { background: var(--accent); }
+  .resize-handle::before {
+    /* Wider hit-area centered on the visible bar */
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0;
+    left: -3px; right: -3px;
   }
 
   /* ── Editor pane ──────────────────────────────────────────── */
@@ -138,7 +166,6 @@
     position: relative;
     background: var(--bg);
     overflow: hidden;
-    border-right: 1px solid var(--separator);
   }
   .editor-wrap {
     display: grid;
@@ -162,7 +189,7 @@
     white-space: pre;
   }
 
-  /* Editor content area (textarea + ghost + floating card) */
+  /* Editor content area (highlight + ghost + textarea + floating card) */
   .editor-content {
     position: relative;
     overflow: hidden;
@@ -178,14 +205,15 @@
     background: rgba(48,209,88,0.10);
     pointer-events: none;
     animation: accept-flash 380ms ease-out;
-    z-index: 4;
+    z-index: 8;
   }
   @keyframes accept-flash {
     0%   { opacity: 1; }
     100% { opacity: 0; }
   }
 
-  .ghost-layer, textarea {
+  /* All three layers share metrics so characters line up exactly */
+  .highlight-layer, .ghost-layer, textarea {
     position: absolute;
     inset: 0;
     margin: 0;
@@ -200,33 +228,53 @@
     overflow: auto;
     tab-size: 4;
   }
+  .highlight-layer {
+    color: var(--text-1);
+    pointer-events: none;
+    user-select: none;
+    z-index: 1;
+  }
+  .highlight-layer code {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    display: inline;
+  }
   .ghost-layer {
     color: transparent;
     pointer-events: none;
     user-select: none;
+    z-index: 2;
   }
+  textarea {
+    /* Text is transparent so the highlight layer shows through.
+       Caret stays visible via caret-color. */
+    color: transparent;
+    caret-color: var(--accent);
+    resize: none;
+    outline: none;
+    z-index: 3;
+  }
+  textarea::selection { background: rgba(10,132,255,0.30); }
+  textarea::placeholder { color: var(--text-3); opacity: 1; }
+  /* When highlight.js failed to load, fall back to plain visible text */
+  .editor-content.no-hl textarea { color: var(--text-1); }
+  .editor-content.no-hl .highlight-layer { display: none; }
+
   .ghost-suggestion {
     color: var(--text-3);
     font-style: italic;
   }
-  .ghost-suggestion.fade-out {
-    animation: ghost-out 200ms forwards;
-  }
+  .ghost-suggestion.fade-out { animation: ghost-out 200ms forwards; }
   @keyframes ghost-out {
     to { opacity: 0; transform: translateX(8px); }
   }
   .ghost-suggestion span,
   .floating-card span.tok,
-  .suggestion-box span.tok {
-    transition: color 150ms;
-  }
-  textarea {
-    color: var(--text-1);
-    caret-color: var(--accent);
-    resize: none;
-    outline: none;
-  }
-  textarea::placeholder { color: var(--text-3); }
+  .suggestion-box span.tok { transition: color 150ms; }
 
   /* Inline "Tab to accept" hint right after ghost text */
   .tab-hint {
@@ -250,6 +298,34 @@
     from { opacity: 0; transform: translateX(-4px); }
     to   { opacity: 1; transform: translateX(0); }
   }
+
+  /* ── highlight.js — Dracula-ish theme tuned to macOS dark ─── */
+  .hljs-keyword,
+  .hljs-literal,
+  .hljs-meta-keyword     { color: #ff79c6; }
+  .hljs-built_in,
+  .hljs-class .hljs-title,
+  .hljs-type             { color: #8be9fd; }
+  .hljs-string,
+  .hljs-template-string  { color: #f1fa8c; }
+  .hljs-number,
+  .hljs-regexp           { color: #bd93f9; }
+  .hljs-comment,
+  .hljs-quote            { color: var(--text-3); font-style: italic; }
+  .hljs-function .hljs-title,
+  .hljs-title.function_  { color: #50fa7b; }
+  .hljs-params           { color: var(--text-1); }
+  .hljs-variable,
+  .hljs-attr             { color: var(--text-1); }
+  .hljs-symbol,
+  .hljs-bullet           { color: #ffb86c; }
+  .hljs-operator,
+  .hljs-meta             { color: #ff79c6; }
+  .hljs-punctuation      { color: var(--text-2); }
+  .hljs-tag              { color: #ff79c6; }
+  .hljs-name             { color: #50fa7b; }
+  .hljs-decorator,
+  .hljs-meta .hljs-string { color: #ffb86c; }
 
   /* ── Floating card (medium-confidence "collapsed" tier) ───── */
   .floating-card {
@@ -352,6 +428,7 @@
     flex-direction: column;
     gap: 12px;
     overflow: auto;
+    min-width: 0;
   }
   .side-title {
     font-size: 10px;
@@ -377,7 +454,7 @@
     letter-spacing: 0.04em;
   }
 
-  /* Activity row inside the activity card */
+  /* Activity row */
   .activity-row {
     display: flex;
     align-items: center;
@@ -428,7 +505,6 @@
   .meter-fill.inline    { background: var(--green); }
   .meter-fill.collapsed { background: var(--orange); }
   .meter-fill.hidden    { background: var(--gray); }
-  /* Threshold tick marks on the meter */
   .meter-tick {
     position: absolute;
     top: -2px; bottom: -2px;
@@ -437,7 +513,6 @@
     pointer-events: none;
   }
 
-  /* UI mode badge */
   .mode-badge {
     font-size: 11px;
     font-weight: 600;
@@ -452,7 +527,6 @@
   .mode-badge.collapsed { background: rgba(255,159,10,0.16); color: var(--orange); }
   .mode-badge.hidden    { background: rgba(255,255,255,0.08); color: var(--text-3); }
 
-  /* Suggestion box (per-token analysis) */
   .suggestion-box {
     background: rgba(0,0,0,0.25);
     border: 1px solid var(--separator);
@@ -479,7 +553,6 @@
   }
   .tok { cursor: help; }
 
-  /* Per-token legend */
   .legend-bar {
     height: 5px;
     border-radius: 999px;
@@ -503,10 +576,7 @@
     font-weight: 600;
   }
 
-  /* Threshold sliders */
-  .threshold-row {
-    margin-top: 12px;
-  }
+  .threshold-row { margin-top: 12px; }
   .threshold-label {
     display: flex;
     justify-content: space-between;
@@ -515,10 +585,7 @@
     margin-bottom: 6px;
   }
   .threshold-label .name { display: flex; align-items: center; gap: 6px; }
-  .threshold-label .swatch {
-    width: 8px; height: 8px;
-    border-radius: 2px;
-  }
+  .threshold-label .swatch { width: 8px; height: 8px; border-radius: 2px; }
   .threshold-label .swatch.high { background: var(--green); }
   .threshold-label .swatch.low  { background: var(--orange); }
   .threshold-label .val {
@@ -553,6 +620,37 @@
     cursor: pointer;
     border: 2px solid var(--card);
   }
+
+  /* Session metrics card */
+  .session-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 5px 12px;
+    margin-top: 10px;
+    font-size: 12px;
+  }
+  .session-grid .key   { color: var(--text-2); }
+  .session-grid .val   { color: var(--text-1); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .session-grid .sub   { color: var(--text-3); font-size: 11px; padding-left: 12px; }
+  .session-grid .sub-val { color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .session-grid .accept-rate {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--separator);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .reset-btn {
+    margin-top: 10px;
+    padding: 4px 10px;
+    font-size: 11px;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-2);
+    border-radius: 5px;
+  }
+  .reset-btn:hover { background: rgba(255,255,255,0.12); color: var(--text-1); }
 
   /* Hints */
   .hint {
@@ -621,7 +719,132 @@
     word-wrap: normal;
     overflow: hidden;
   }
+
+  /* ── Settings drawer ──────────────────────────────────────── */
+  .drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms;
+  }
+  .drawer-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .settings-drawer {
+    position: fixed;
+    top: 0; right: 0;
+    width: 360px;
+    max-width: 100vw;
+    height: 100vh;
+    background: var(--bg-sidebar);
+    border-left: 1px solid var(--separator);
+    z-index: 201;
+    transform: translateX(100%);
+    transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    box-shadow: -8px 0 24px rgba(0,0,0,0.4);
+  }
+  .settings-drawer.show { transform: translateX(0); }
+  .settings-drawer header {
+    display: flex;
+    align-items: center;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--separator);
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .settings-drawer h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .settings-drawer .close-btn {
+    margin-left: auto;
+    padding: 4px 10px;
+    background: rgba(255,255,255,0.08);
+    color: var(--text-2);
+    border-radius: 6px;
+    font-size: 16px;
+    line-height: 1;
+  }
+  .settings-drawer .close-btn:hover { background: rgba(255,255,255,0.16); color: var(--text-1); }
+
+  .settings-body {
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .setting-group {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .setting-group .group-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+  .setting-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .setting-row + .setting-row { margin-top: 14px; }
+  .setting-row .label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+  }
+  .setting-row .label { color: var(--text-1); }
+  .setting-row .help  { color: var(--text-3); font-size: 11px; line-height: 1.5; }
+  .setting-row .val   { color: var(--text-2); font-variant-numeric: tabular-nums; font-size: 11.5px; }
+
+  /* Toggle switch */
+  .toggle {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+  }
+  .toggle input { display: none; }
+  .toggle .slider {
+    position: absolute; inset: 0;
+    background: rgba(255,255,255,0.16);
+    border-radius: 999px;
+    transition: background 160ms;
+    cursor: pointer;
+  }
+  .toggle .slider::before {
+    content: "";
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .toggle input:checked + .slider { background: var(--green); }
+  .toggle input:checked + .slider::before { transform: translateX(16px); }
 </style>
+
+<!-- highlight.js for syntax highlighting (with onerror fallback) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"
+        onerror="window.__hljsFailed = true"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"
+        onerror="window.__hljsFailed = true"></script>
 </head>
 <body>
 
@@ -632,16 +855,18 @@
     <span id="status-text">connecting…</span>
   </span>
   <div class="right">
+    <button id="settings-btn" class="icon" title="Settings">⚙</button>
     <button id="clear-btn" class="secondary">Clear</button>
     <button id="copy-btn" class="secondary" disabled>Copy code</button>
   </div>
 </header>
 
-<main>
+<main id="main">
   <div class="editor-pane">
     <div class="editor-wrap">
       <div class="gutter" id="gutter"></div>
       <div class="editor-content" id="editor-content">
+        <pre class="highlight-layer" id="highlight-layer"><code id="highlight-code" class="language-python"></code></pre>
         <div class="ghost-layer" id="ghost"><span id="ghost-prefix"></span><span class="ghost-suggestion" id="ghost-suggestion"></span><span class="tab-hint" id="tab-hint" style="display:none">⇥ Tab</span></div>
         <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"
           placeholder="Start typing Python here…&#10;&#10;def sort_list(arr):&#10;    "></textarea>
@@ -662,6 +887,8 @@
       </div>
     </div>
   </div>
+
+  <div class="resize-handle" id="resize-handle" title="Drag to resize · double-click to collapse"></div>
 
   <aside class="side-pane">
     <div class="side-title">Analytics</div>
@@ -722,6 +949,30 @@
       </div>
     </div>
 
+    <div class="card">
+      <div class="card-label">
+        <span>Session</span>
+        <span id="session-elapsed" style="color:var(--text-3); font-weight:500; font-size:10.5px;">00:00</span>
+      </div>
+      <div class="session-grid">
+        <span class="key">Shown</span>            <span class="val" id="m-shown">0</span>
+        <span class="sub">· Inline</span>          <span class="sub-val" id="m-shown-inline">0</span>
+        <span class="sub">· Collapsed</span>       <span class="sub-val" id="m-shown-collapsed">0</span>
+        <span class="sub">· Suppressed</span>      <span class="sub-val" id="m-shown-hidden">0</span>
+        <span class="key">Accepted</span>          <span class="val" id="m-accepted">0</span>
+        <span class="sub">· Full (Tab)</span>      <span class="sub-val" id="m-accepted-full">0</span>
+        <span class="sub">· Word (Ctrl+→)</span>   <span class="sub-val" id="m-accepted-word">0</span>
+        <span class="key">Rejected</span>          <span class="val" id="m-rejected">0</span>
+        <span class="sub">· Esc</span>             <span class="sub-val" id="m-rejected-esc">0</span>
+        <span class="sub">· Typed over</span>      <span class="sub-val" id="m-rejected-typed">0</span>
+        <span class="accept-rate">
+          <span class="key">Accept rate</span>
+          <span class="val" id="m-rate">—</span>
+        </span>
+      </div>
+      <button class="reset-btn" id="reset-session">Reset session</button>
+    </div>
+
     <div class="hint">
       <kbd>Tab</kbd> accept all &nbsp;·&nbsp; <kbd>Ctrl</kbd>+<kbd>→</kbd> accept word<br>
       <kbd>Esc</kbd> dismiss &nbsp;·&nbsp; <kbd>Alt</kbd>+<kbd>\</kbd> peek collapsed
@@ -731,19 +982,78 @@
 
 <div class="tok-tooltip" id="tok-tooltip"></div>
 
+<!-- Settings drawer -->
+<div class="drawer-backdrop" id="drawer-backdrop"></div>
+<aside class="settings-drawer" id="settings-drawer" aria-hidden="true">
+  <header>
+    <h2>Settings</h2>
+    <button class="close-btn" id="settings-close" aria-label="Close">✕</button>
+  </header>
+  <div class="settings-body">
+
+    <div class="setting-group">
+      <div class="group-title">Completion</div>
+
+      <div class="setting-row">
+        <div class="label-row">
+          <span class="label">Debounce delay</span>
+          <span class="val" id="set-debounce-val">400 ms</span>
+        </div>
+        <input type="range" id="set-debounce" min="100" max="1000" step="50" value="400">
+        <div class="help">How long to wait after the last keystroke before requesting a suggestion. Lower = snappier, higher = fewer wasted requests.</div>
+      </div>
+
+      <div class="setting-row">
+        <div class="label-row">
+          <span class="label">Max new tokens</span>
+          <span class="val" id="set-maxtok-val">64</span>
+        </div>
+        <input type="range" id="set-maxtok" min="16" max="256" step="8" value="64">
+        <div class="help">Upper bound on completion length. Higher = longer suggestions, slower responses.</div>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <div class="group-title">Behavior</div>
+
+      <div class="setting-row">
+        <div class="label-row">
+          <span class="label">Auto-retrigger after accept</span>
+          <label class="toggle"><input type="checkbox" id="set-retrigger" checked><span class="slider"></span></label>
+        </div>
+        <div class="help">After you accept a suggestion, automatically request the next one (Copilot-style continuation). Press Esc to dismiss.</div>
+      </div>
+
+      <div class="setting-row">
+        <div class="label-row">
+          <span class="label">Bracket auto-close</span>
+          <label class="toggle"><input type="checkbox" id="set-brackets" checked><span class="slider"></span></label>
+        </div>
+        <div class="help">Auto-insert closing <code>) ] } " ' `</code> and skip-over the closer when typed. Smart backspace deletes empty pairs.</div>
+      </div>
+    </div>
+
+  </div>
+</aside>
+
 <script>
 "use strict";
 
 const API_BASE = "http://localhost:8000";
-const STORAGE_KEY = "promptsuggest.editor.v1";
+const STORAGE_KEY   = "promptsuggest.editor.v1";
+const SETTINGS_KEY  = "promptsuggest.settings.v1";
+const THRESHOLD_KEY = "promptsuggest.thresholds.v1";
+const SIDE_WIDTH_KEY= "promptsuggest.sideWidth.v1";
 const CACHE_TTL_MS = 60_000;
 const CACHE_MAX = 50;
-const DEBOUNCE_MS = 400;
+const RETRIGGER_DELAY_MS = 500;
 
 // ── DOM refs ─────────────────────────────────────────────────────
 const editor          = document.getElementById("editor");
 const editorContent   = document.getElementById("editor-content");
 const gutter          = document.getElementById("gutter");
+const highlightLayer  = document.getElementById("highlight-layer");
+const highlightCode   = document.getElementById("highlight-code");
 const ghostLayer      = document.getElementById("ghost");
 const ghostPrefix     = document.getElementById("ghost-prefix");
 const ghostSuggestion = document.getElementById("ghost-suggestion");
@@ -761,6 +1071,10 @@ const modeBadge       = document.getElementById("mode-badge");
 const suggestionBox   = document.getElementById("suggestion-box");
 const copyBtn         = document.getElementById("copy-btn");
 const clearBtn        = document.getElementById("clear-btn");
+const settingsBtn     = document.getElementById("settings-btn");
+const settingsDrawer  = document.getElementById("settings-drawer");
+const drawerBackdrop  = document.getElementById("drawer-backdrop");
+const settingsClose   = document.getElementById("settings-close");
 const activityChip    = document.getElementById("activity-chip");
 const activityChipText= document.getElementById("activity-chip-text");
 const activityRow     = document.getElementById("activity-row");
@@ -771,16 +1085,78 @@ const lowSlider       = document.getElementById("low-slider");
 const highVal         = document.getElementById("high-val");
 const lowVal          = document.getElementById("low-val");
 const tokTooltip      = document.getElementById("tok-tooltip");
+const resizeHandle    = document.getElementById("resize-handle");
+// Session metrics
+const mShown          = document.getElementById("m-shown");
+const mShownInline    = document.getElementById("m-shown-inline");
+const mShownCollapsed = document.getElementById("m-shown-collapsed");
+const mShownHidden    = document.getElementById("m-shown-hidden");
+const mAccepted       = document.getElementById("m-accepted");
+const mAcceptedFull   = document.getElementById("m-accepted-full");
+const mAcceptedWord   = document.getElementById("m-accepted-word");
+const mRejected       = document.getElementById("m-rejected");
+const mRejectedEsc    = document.getElementById("m-rejected-esc");
+const mRejectedTyped  = document.getElementById("m-rejected-typed");
+const mRate           = document.getElementById("m-rate");
+const sessionElapsed  = document.getElementById("session-elapsed");
+const resetSessionBtn = document.getElementById("reset-session");
+// Settings inputs
+const setDebounce   = document.getElementById("set-debounce");
+const setDebounceVal= document.getElementById("set-debounce-val");
+const setMaxtok     = document.getElementById("set-maxtok");
+const setMaxtokVal  = document.getElementById("set-maxtok-val");
+const setRetrigger  = document.getElementById("set-retrigger");
+const setBrackets   = document.getElementById("set-brackets");
 
 // ── State ────────────────────────────────────────────────────────
-let currentSuggestion  = null;     // {completion, confidence, tokens, prefix}
+let currentSuggestion  = null;     // {completion, confidence, tokens, prefix, ui_mode, _shown}
 let debounceTimer      = null;
-let inflight           = null;     // AbortController of running fetch
+let retriggerTimer     = null;
+let inflight           = null;
 let inflightPrefix     = null;
 let readyTimer         = null;
 let lastInputType      = null;     // 'insert' | 'delete' | null
+let suppressNextInputTrigger = false;  // set when accept fires synthetic input
 let thresholds         = { high: 0.80, low: 0.40 };
-const responseCache    = new Map(); // prefix -> {result, ts}
+const responseCache    = new Map();
+
+let settings = {
+  debounceMs: 400,
+  maxNewTokens: 64,
+  autoRetrigger: true,
+  bracketAutoClose: true,
+};
+
+const session = {
+  startTime: Date.now(),
+  shown:    { inline: 0, collapsed: 0, hidden: 0 },
+  accepted: { full: 0, word: 0 },
+  rejected: { esc: 0, typed: 0 },
+};
+
+// ── Settings load/save ───────────────────────────────────────────
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) Object.assign(settings, JSON.parse(raw));
+  } catch {}
+  try {
+    const raw = localStorage.getItem(THRESHOLD_KEY);
+    if (raw) Object.assign(thresholds, JSON.parse(raw));
+  } catch {}
+  try {
+    const w = parseInt(localStorage.getItem(SIDE_WIDTH_KEY), 10);
+    if (!Number.isNaN(w) && w >= 0 && w <= 800) {
+      document.documentElement.style.setProperty("--side-width", w + "px");
+    }
+  } catch {}
+}
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+}
+function saveThresholds() {
+  try { localStorage.setItem(THRESHOLD_KEY, JSON.stringify(thresholds)); } catch {}
+}
 
 // ── AI activity state machine ────────────────────────────────────
 const STATE_LABELS = {
@@ -794,17 +1170,13 @@ const STATE_LABELS = {
 function setAiState(state, detail = "") {
   clearTimeout(readyTimer);
   const label = STATE_LABELS[state] ?? state;
-
   activityRow.dataset.state = state;
   activityText.textContent = label;
   activityDetail.textContent = detail;
-
   activityChip.dataset.state = state;
   activityChipText.textContent = label;
-
   if (state === "idle") activityChip.classList.remove("show");
   else                  activityChip.classList.add("show");
-
   if (state === "ready") {
     readyTimer = setTimeout(() => setAiState("idle"), 1600);
   }
@@ -818,7 +1190,6 @@ function cacheGet(prefix) {
     responseCache.delete(prefix);
     return null;
   }
-  // LRU bump
   responseCache.delete(prefix);
   responseCache.set(prefix, e);
   return e.result;
@@ -830,9 +1201,9 @@ function cacheSet(prefix, result) {
   }
 }
 
-// ── Cancel anything pending (Esc, Accept, mode change) ───────────
 function cancelPending() {
   clearTimeout(debounceTimer);
+  clearTimeout(retriggerTimer);
   if (inflight) {
     inflight.abort();
     inflight = null;
@@ -840,7 +1211,7 @@ function cancelPending() {
   }
 }
 
-// ── Health check (poll until model loaded) ───────────────────────
+// ── Health check ─────────────────────────────────────────────────
 async function checkHealth() {
   try {
     const r = await fetch(`${API_BASE}/health`);
@@ -861,7 +1232,7 @@ async function checkHealth() {
 }
 checkHealth();
 
-// ── Caret coords helper (mirror-div technique) ───────────────────
+// ── Caret coords (mirror-div technique) ──────────────────────────
 const mirrorDiv = document.createElement("div");
 mirrorDiv.className = "caret-mirror";
 document.body.appendChild(mirrorDiv);
@@ -878,7 +1249,6 @@ const COPY_PROPS = [
 
 function getCaretCoords(input, position) {
   const styles = getComputedStyle(input);
-  // Reset and copy styles
   mirrorDiv.removeAttribute("style");
   mirrorDiv.className = "caret-mirror";
   for (const p of COPY_PROPS) mirrorDiv.style[p] = styles[p];
@@ -894,12 +1264,9 @@ function getCaretCoords(input, position) {
   const mirrorRect = mirrorDiv.getBoundingClientRect();
   const spanRect   = span.getBoundingClientRect();
 
-  // The span sits at the caret location inside the mirror.
-  // Position relative to mirror's border box = position relative to input's border box.
   const top  = (spanRect.top  - mirrorRect.top)  - input.scrollTop;
   const left = (spanRect.left - mirrorRect.left) - input.scrollLeft;
   const lineHeight = parseFloat(styles.lineHeight) || (parseFloat(styles.fontSize) * 1.4);
-
   return { top, left, lineHeight, inputRect };
 }
 
@@ -909,12 +1276,9 @@ function positionFloatingCard() {
   const contentRect = editorContent.getBoundingClientRect();
   const editorRect  = caret.inputRect;
 
-  // Caret coords are relative to textarea's border box.
-  // Convert to editor-content's coordinate space.
   let left = (editorRect.left - contentRect.left) + caret.left;
   let top  = (editorRect.top  - contentRect.top)  + caret.top + caret.lineHeight + 4;
 
-  // Measure card to clamp
   floatingCard.style.left = "0px";
   floatingCard.style.top  = "0px";
   const cardRect = floatingCard.getBoundingClientRect();
@@ -923,7 +1287,6 @@ function positionFloatingCard() {
   if (left > maxLeft) left = Math.max(8, maxLeft);
   if (left < 8) left = 8;
 
-  // If the card would go off the bottom, flip above the caret line
   const wouldOverflowBottom = top + cardRect.height > contentRect.height - 8;
   if (wouldOverflowBottom) {
     top = (editorRect.top - contentRect.top) + caret.top - cardRect.height - 4;
@@ -937,10 +1300,9 @@ function positionFloatingCard() {
 // ── Per-token color (heatmap) ────────────────────────────────────
 function colorForLogprob(logprob) {
   const prob = Math.exp(logprob);
-  const hue = Math.round(prob * 120);             // 0=red → 120=green
+  const hue = Math.round(prob * 120);
   return `hsl(${hue}, 60%, 60%)`;
 }
-
 function buildTokenSpans(tokens, { dim = false } = {}) {
   const frag = document.createDocumentFragment();
   for (const tok of tokens) {
@@ -955,7 +1317,7 @@ function buildTokenSpans(tokens, { dim = false } = {}) {
   return frag;
 }
 
-// ── Threshold-driven UI mode (overrides server's value) ──────────
+// ── UI mode by threshold ─────────────────────────────────────────
 function uiModeFor(confidence) {
   if (confidence >= thresholds.high) return "inline";
   if (confidence >= thresholds.low)  return "collapsed";
@@ -965,6 +1327,7 @@ function uiModeFor(confidence) {
 // ── Render the three UI tiers ────────────────────────────────────
 function renderSuggestion(prefix, s) {
   if (!s || !s.completion) { clearSuggestion(); return; }
+  const wasNewSuggestion = !s._shown;
   s = { ...s, prefix };
   currentSuggestion = s;
 
@@ -973,7 +1336,14 @@ function renderSuggestion(prefix, s) {
   const ui_mode = uiModeFor(confidence);
   s.ui_mode = ui_mode;
 
-  // Always update analytics panel
+  // Count "shown" only the first time this suggestion is rendered.
+  // Re-renders from threshold-slider changes don't re-count.
+  if (wasNewSuggestion) {
+    s._shown = true;
+    session.shown[ui_mode]++;
+    updateSessionMetrics();
+  }
+
   confidenceNum.textContent = `${(confidence * 100).toFixed(1)}%`;
   meterFill.style.width = `${Math.min(confidence * 100, 100)}%`;
   meterFill.className = `meter-fill ${ui_mode}`;
@@ -989,21 +1359,13 @@ function renderSuggestion(prefix, s) {
   }
 
   suggestionBox.className = "suggestion-box";
-  if (tokenList.length > 0) {
-    suggestionBox.replaceChildren(buildTokenSpans(tokenList));
-  } else {
-    suggestionBox.textContent = completion;
-  }
+  if (tokenList.length > 0) suggestionBox.replaceChildren(buildTokenSpans(tokenList));
+  else                      suggestionBox.textContent = completion;
 
   if (ui_mode === "inline" && cursorIsAtPrefixEnd(prefix) && cursorIsAtEndOfLine()) {
     showGhost(prefix, completion, tokenList);
     hideFloating();
-  } else if (ui_mode === "inline") {
-    // Inline allowed by confidence, but cursor moved or not at EOL → fall back to floating
-    hideGhost();
-    showFloating(completion, tokenList);
   } else {
-    // collapsed
     hideGhost();
     showFloating(completion, tokenList);
   }
@@ -1017,10 +1379,8 @@ function showGhost(prefix, completion, tokens) {
     ghostSuggestion.textContent = completion;
   }
   ghostSuggestion.classList.remove("fade-out");
-  // Tab hint shows next to ghost text after a short delay
   tabHint.style.display = "inline-block";
 }
-
 function hideGhost() {
   ghostPrefix.textContent = "";
   ghostSuggestion.replaceChildren();
@@ -1030,12 +1390,8 @@ function hideGhost() {
 
 function showFloating(completion, tokens) {
   floatingCard.classList.remove("hidden", "expanded");
-  if (tokens.length > 0) {
-    floatingBody.replaceChildren(buildTokenSpans(tokens));
-  } else {
-    floatingBody.textContent = completion;
-  }
-  // Multi-line indicator
+  if (tokens.length > 0) floatingBody.replaceChildren(buildTokenSpans(tokens));
+  else                   floatingBody.textContent = completion;
   const lines = completion.split("\n");
   if (lines.length > 1) {
     floatingMore.textContent = `▾ +${lines.length - 1} more line${lines.length > 2 ? "s" : ""} · Alt+\\ to expand`;
@@ -1043,16 +1399,13 @@ function showFloating(completion, tokens) {
   } else {
     floatingMore.style.display = "none";
   }
-  // Position then reveal
   requestAnimationFrame(() => {
     positionFloatingCard();
     floatingCard.classList.add("show");
   });
 }
-
 function hideFloating() {
   floatingCard.classList.remove("show", "expanded");
-  // Delay actual hide until transition finishes
   setTimeout(() => {
     if (!floatingCard.classList.contains("show")) {
       floatingCard.classList.add("hidden");
@@ -1073,17 +1426,13 @@ function clearSuggestion() {
   suggestionBox.className = "suggestion-box empty";
 }
 
-// ── Trigger validity checks ──────────────────────────────────────
+// ── Trigger validity ─────────────────────────────────────────────
 function cursorIsAtPrefixEnd(prefix) {
-  // The suggestion was generated for `prefix`. It is only valid to render
-  // inline if the cursor is currently at exactly that position in the editor.
   return editor.value.slice(0, editor.selectionStart) === prefix;
 }
-
 function cursorIsAtEndOfLine() {
   const pos = editor.selectionStart;
   const text = editor.value;
-  // Reject if there is non-whitespace between cursor and the next \n.
   for (let i = pos; i < text.length; i++) {
     const c = text[i];
     if (c === "\n") return true;
@@ -1091,33 +1440,28 @@ function cursorIsAtEndOfLine() {
   }
   return true;
 }
-
 function selectionIsCollapsed() {
   return editor.selectionStart === editor.selectionEnd;
 }
 
 // ── Backend call ─────────────────────────────────────────────────
+class HttpError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+
 async function requestCompletion(prefix) {
-  // Cache hit?
   const cached = cacheGet(prefix);
   if (cached) return cached;
-
-  // Same prefix already in flight? Just wait on it via the existing controller.
-  if (inflight && inflightPrefix === prefix) {
-    // Re-issue would be redundant; let it complete and fall through.
-    // (The original caller will resolve renderSuggestion.)
-  }
 
   if (inflight) inflight.abort();
   const ctrl = new AbortController();
   inflight = ctrl;
   inflightPrefix = prefix;
-
   try {
     const r = await fetch(`${API_BASE}/api/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prefix, max_new_tokens: 64 }),
+      body: JSON.stringify({ prefix, max_new_tokens: settings.maxNewTokens }),
       signal: ctrl.signal,
     });
     if (!r.ok) {
@@ -1136,102 +1480,179 @@ async function requestCompletion(prefix) {
   }
 }
 
-class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
+function describeError(err) {
+  return err instanceof HttpError
+    ? (err.status === 503 ? "Backend is still loading the model. Retry shortly."
+                          : `Server returned ${err.status}.`)
+    : "Cannot reach backend at " + API_BASE + ".";
 }
 
-// ── Editor: typing → completion ──────────────────────────────────
-editor.addEventListener("input", (e) => {
-  // Tracker for delete/insert for trigger logic
-  lastInputType = (e.inputType || "").startsWith("delete") ? "delete" : "insert";
-
-  // Clear any previous suggestion immediately (it's stale)
-  clearSuggestion();
+// ── Trigger logic (factored out for input + auto-retrigger) ──────
+// `immediate=true` skips the user-typing debounce. Used after accept.
+function scheduleCompletion(prefix, { immediate = false } = {}) {
   clearTimeout(debounceTimer);
-  saveSoon();
-  updateGutter();
-  refreshCopyBtn();
-
-  const prefix = editor.value.slice(0, editor.selectionStart);
   if (!prefix.trim()) {
     setAiState("idle");
     return;
   }
-
-  // Don't pop suggestions while the user is deleting — that's annoying.
-  if (lastInputType === "delete") {
-    setAiState("idle");
-    return;
-  }
-
-  // Don't trigger if the user has a selection (they're about to overwrite).
-  if (!selectionIsCollapsed()) {
-    setAiState("idle");
-    return;
-  }
-
-  // Cache hit? Render instantly.
   const cached = cacheGet(prefix);
   if (cached) {
     renderSuggestion(prefix, cached);
     setAiState("ready");
     return;
   }
+  if (!immediate) setAiState("thinking");
 
-  setAiState("thinking");
-  debounceTimer = setTimeout(async () => {
+  const fire = async () => {
     setAiState("generating");
     try {
       const result = await requestCompletion(prefix);
-      // Make sure the user's prefix hasn't moved since we kicked this off.
       const currentPrefix = editor.value.slice(0, editor.selectionStart);
       if (currentPrefix === prefix) {
         renderSuggestion(prefix, result);
         setAiState("ready");
       } else {
-        // Stale; leave state to whatever the next request sets.
         setAiState("idle");
       }
     } catch (err) {
       if (err.name === "AbortError") return;
       console.error(err);
-      const detail = err instanceof HttpError
-        ? (err.status === 503 ? "Backend is still loading the model. Retry shortly."
-                              : `Server returned ${err.status}.`)
-        : "Cannot reach backend at " + API_BASE + ".";
-      setAiState("error", detail);
+      setAiState("error", describeError(err));
     }
-  }, DEBOUNCE_MS);
+  };
+  if (immediate) fire();
+  else           debounceTimer = setTimeout(fire, settings.debounceMs);
+}
+
+// ── Editor: typing → completion ──────────────────────────────────
+editor.addEventListener("input", (e) => {
+  // Skip the trigger logic for synthetic input events from accepts.
+  if (suppressNextInputTrigger) {
+    suppressNextInputTrigger = false;
+    updateHighlight();
+    updateGutter();
+    refreshCopyBtn();
+    saveSoon();
+    return;
+  }
+
+  lastInputType = (e.inputType || "").startsWith("delete") ? "delete" : "insert";
+
+  // Implicit rejection: user typed while a suggestion was visible.
+  if (currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
+    session.rejected.typed++;
+    updateSessionMetrics();
+  }
+
+  clearSuggestion();
+  clearTimeout(debounceTimer);
+  clearTimeout(retriggerTimer);
+  updateHighlight();
+  updateGutter();
+  refreshCopyBtn();
+  saveSoon();
+
+  const prefix = editor.value.slice(0, editor.selectionStart);
+  if (!prefix.trim())            { setAiState("idle"); return; }
+  if (lastInputType === "delete"){ setAiState("idle"); return; }
+  if (!selectionIsCollapsed())   { setAiState("idle"); return; }
+
+  scheduleCompletion(prefix);
 });
 
-// Cursor-only moves (arrow keys, click) should also clear stale ghosts
-editor.addEventListener("click", () => { syncSuggestionVisibility(); });
+editor.addEventListener("click", () => syncSuggestionVisibility());
 editor.addEventListener("keyup", (e) => {
-  // For navigation keys, just re-check if existing ghost should still show
   if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Home","End","PageUp","PageDown"].includes(e.key)) {
     syncSuggestionVisibility();
   }
 });
-
 function syncSuggestionVisibility() {
   if (!currentSuggestion) return;
-  // If cursor moved away from where the suggestion was generated, hide ghost / floating
   if (!cursorIsAtPrefixEnd(currentSuggestion.prefix)) {
     hideGhost();
     hideFloating();
     return;
   }
-  // Reposition floating card if it's showing
   if (currentSuggestion.ui_mode === "collapsed" || floatingCard.classList.contains("show")) {
     positionFloatingCard();
   }
 }
 
-// ── Keyboard: Tab / Esc / Ctrl+→ / Alt+\ ─────────────────────────
+// ── Bracket auto-close (smart pair, overstrike, backspace) ───────
+const PAIR_OPEN  = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'", "`": "`" };
+const PAIR_CLOSE = new Set([")","]","}",'"',"'","`"]);
+const QUOTES = new Set(['"',"'","`"]);
+
+function bracketKeydown(e) {
+  if (!settings.bracketAutoClose) return false;
+  const key = e.key;
+
+  // Smart skip: typing the same closing char that's already to the right → step over
+  if (PAIR_CLOSE.has(key) && selectionIsCollapsed()) {
+    if (editor.value[editor.selectionStart] === key) {
+      e.preventDefault();
+      const pos = editor.selectionStart + 1;
+      editor.setSelectionRange(pos, pos);
+      return true;
+    }
+  }
+
+  // Smart backspace: cursor between empty pair → delete both halves
+  if (key === "Backspace" && selectionIsCollapsed()) {
+    const prev = editor.value[editor.selectionStart - 1];
+    const next = editor.value[editor.selectionStart];
+    if (prev && PAIR_OPEN[prev] && PAIR_OPEN[prev] === next) {
+      e.preventDefault();
+      // Select both halves of the pair and delete in a single op (keeps undo stack)
+      const pos = editor.selectionStart;
+      editor.setSelectionRange(pos - 1, pos + 1);
+      document.execCommand("delete");
+      return true;
+    }
+  }
+
+  // Pair insert
+  if (PAIR_OPEN[key]) {
+    if (selectionIsCollapsed()) {
+      // For quote chars, don't pair when adjacent to a word character — that's
+      // typically string concatenation or a quote inside text, not a new pair.
+      if (QUOTES.has(key)) {
+        const before = editor.value[editor.selectionStart - 1];
+        const after  = editor.value[editor.selectionStart];
+        if ((before && /[\w]/.test(before)) || (after && /[\w]/.test(after))) return false;
+        // Skip-over for quotes (typing `"` inside `"hello "`)
+        if (after === key) {
+          e.preventDefault();
+          const pos = editor.selectionStart + 1;
+          editor.setSelectionRange(pos, pos);
+          return true;
+        }
+      }
+      e.preventDefault();
+      document.execCommand("insertText", false, key + PAIR_OPEN[key]);
+      const pos = editor.selectionStart - 1;
+      editor.setSelectionRange(pos, pos);
+      return true;
+    } else {
+      // Wrap selected text
+      const start = editor.selectionStart;
+      const end   = editor.selectionEnd;
+      const sel   = editor.value.slice(start, end);
+      e.preventDefault();
+      document.execCommand("insertText", false, key + sel + PAIR_OPEN[key]);
+      editor.setSelectionRange(start + 1, end + 1);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// ── Keyboard: Tab / Esc / Ctrl+→ / Alt+\ / brackets ──────────────
 editor.addEventListener("keydown", (e) => {
+  // Brackets first (mutates value, fires input → triggers our handlers)
+  if (bracketKeydown(e)) return;
+
   // Alt+\: peek (expand floating card)
   if (e.altKey && e.key === "\\" && currentSuggestion && !floatingCard.classList.contains("hidden")) {
     e.preventDefault();
@@ -1239,7 +1660,7 @@ editor.addEventListener("keydown", (e) => {
     return;
   }
 
-  // Ctrl+→ (or Cmd+→): accept first word of suggestion
+  // Ctrl+→: accept word
   if ((e.ctrlKey || e.metaKey) && e.key === "ArrowRight" && currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
     if (acceptWord()) {
       e.preventDefault();
@@ -1247,7 +1668,7 @@ editor.addEventListener("keydown", (e) => {
     }
   }
 
-  // Tab: accept full suggestion
+  // Tab: accept full
   if (e.key === "Tab" && currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
     e.preventDefault();
     acceptFull();
@@ -1256,46 +1677,75 @@ editor.addEventListener("keydown", (e) => {
 
   // Esc: dismiss
   if (e.key === "Escape") {
+    if (currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
+      session.rejected.esc++;
+      updateSessionMetrics();
+    }
     cancelPending();
     clearSuggestion();
     setAiState("idle");
   }
 });
 
+// ── Insertion helpers (preserve native undo) ─────────────────────
+function insertText(text) {
+  // execCommand('insertText') keeps the browser undo/redo stack in sync.
+  // Falls back to direct value mutation if the browser refuses (rare).
+  if (!document.execCommand || !document.execCommand("insertText", false, text)) {
+    const start = editor.selectionStart;
+    const end   = editor.selectionEnd;
+    editor.value = editor.value.slice(0, start) + text + editor.value.slice(end);
+    const pos = start + text.length;
+    editor.setSelectionRange(pos, pos);
+    // Manually fire input so the rest of the pipeline (highlight, gutter…) updates
+    suppressNextInputTrigger = true;
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
 function acceptFull() {
   if (!currentSuggestion) return;
   const text = currentSuggestion.completion;
-  // Fade-out animation on ghost text, then insert
   ghostSuggestion.classList.add("fade-out");
   flashAccept();
+  session.accepted.full++;
+  updateSessionMetrics();
+
   setTimeout(() => {
-    insertAtCursor(text);
+    suppressNextInputTrigger = true;
+    insertText(text);
     cancelPending();
     clearSuggestion();
     setAiState("idle");
     saveSoon();
     refreshCopyBtn();
     updateGutter();
+    updateHighlight();
+    scheduleAutoRetrigger();
   }, 90);
 }
 
 function acceptWord() {
   if (!currentSuggestion) return false;
   const text = currentSuggestion.completion;
-  // Match leading whitespace + first non-whitespace run, OR a run of whitespace alone.
   const m = text.match(/^(\s*\S+|\s+)/);
   if (!m) return false;
   const piece = m[1];
-  insertAtCursor(piece);
+
+  suppressNextInputTrigger = true;
+  insertText(piece);
   flashAccept();
+  session.accepted.word++;
+  updateSessionMetrics();
+
   const remaining = text.slice(piece.length);
   if (remaining.length === 0) {
     cancelPending();
     clearSuggestion();
     setAiState("idle");
+    scheduleAutoRetrigger();
   } else {
-    // Trim consumed tokens. We do this by character count; close enough since
-    // tokens are reflected verbatim in `completion`.
+    // Trim consumed chars off the leading tokens so heatmap stays accurate.
     let consumed = piece.length;
     const remainingTokens = [];
     for (const t of currentSuggestion.tokens || []) {
@@ -1312,34 +1762,38 @@ function acceptWord() {
     currentSuggestion.completion = remaining;
     currentSuggestion.tokens = remainingTokens;
     currentSuggestion.prefix = editor.value.slice(0, editor.selectionStart);
-    // Re-render with the new prefix anchor
+    // Mark as "already counted" so re-render doesn't double-count `shown`.
     renderSuggestion(currentSuggestion.prefix, currentSuggestion);
   }
   saveSoon();
   refreshCopyBtn();
   updateGutter();
+  updateHighlight();
   return true;
 }
 
 function flashAccept() {
   editorContent.classList.remove("accepted");
-  // Force reflow so the animation restarts
   void editorContent.offsetWidth;
   editorContent.classList.add("accepted");
   setTimeout(() => editorContent.classList.remove("accepted"), 400);
 }
 
-function insertAtCursor(text) {
-  const start = editor.selectionStart;
-  const end = editor.selectionEnd;
-  editor.value = editor.value.slice(0, start) + text + editor.value.slice(end);
-  const pos = start + text.length;
-  editor.setSelectionRange(pos, pos);
+// ── Auto-retrigger after accept ──────────────────────────────────
+function scheduleAutoRetrigger() {
+  clearTimeout(retriggerTimer);
+  if (!settings.autoRetrigger) return;
+  retriggerTimer = setTimeout(() => {
+    // Only fire if the user is still idle at the same caret position
+    if (currentSuggestion) return;        // a different suggestion already showed
+    if (!selectionIsCollapsed()) return;
+    const prefix = editor.value.slice(0, editor.selectionStart);
+    if (!prefix.trim()) return;
+    scheduleCompletion(prefix, { immediate: true });
+  }, RETRIGGER_DELAY_MS);
 }
 
-// ── Floating card click → expand/collapse + accept on body click ─
-// preventDefault on mousedown so the textarea keeps focus (and its caret
-// position) when the user clicks the card.
+// ── Floating card click → expand / accept ────────────────────────
 floatingCard.addEventListener("mousedown", (e) => e.preventDefault());
 floatingMore.addEventListener("click", () => {
   floatingCard.classList.toggle("expanded");
@@ -1349,9 +1803,8 @@ floatingBody.addEventListener("click", () => {
   if (currentSuggestion) acceptFull();
 });
 
-// ── Threshold sliders (reactive re-render) ───────────────────────
+// ── Threshold sliders ────────────────────────────────────────────
 function applyThresholds() {
-  // Clamp: low ≤ high
   let high = parseInt(highSlider.value, 10) / 100;
   let low  = parseInt(lowSlider.value,  10) / 100;
   if (low > high) {
@@ -1364,18 +1817,17 @@ function applyThresholds() {
     }
   }
   thresholds = { high, low };
+  saveThresholds();
   highVal.textContent = high.toFixed(2);
   lowVal.textContent  = low.toFixed(2);
   tickHigh.style.left = `${high * 100}%`;
   tickLow.style.left  = `${low  * 100}%`;
-  // Re-render existing suggestion with new thresholds
   if (currentSuggestion) {
     renderSuggestion(currentSuggestion.prefix, currentSuggestion);
   }
 }
 highSlider.addEventListener("input", applyThresholds);
 lowSlider.addEventListener("input",  applyThresholds);
-applyThresholds();
 
 // ── Token hover tooltip ──────────────────────────────────────────
 document.addEventListener("mouseover", (e) => {
@@ -1434,6 +1886,7 @@ clearBtn.addEventListener("click", () => {
   clearSuggestion();
   saveNow();
   updateGutter();
+  updateHighlight();
   refreshCopyBtn();
   editor.focus();
 });
@@ -1442,11 +1895,13 @@ clearBtn.addEventListener("click", () => {
 editor.addEventListener("focus", () => editorContent.classList.add("focused"));
 editor.addEventListener("blur",  () => editorContent.classList.remove("focused"));
 
-// ── Scroll sync (gutter + ghost layer + floating card) ───────────
+// ── Scroll sync (gutter + ghost layer + highlight layer) ─────────
 editor.addEventListener("scroll", () => {
-  ghostLayer.scrollTop  = editor.scrollTop;
-  ghostLayer.scrollLeft = editor.scrollLeft;
-  gutter.scrollTop      = editor.scrollTop;
+  ghostLayer.scrollTop      = editor.scrollTop;
+  ghostLayer.scrollLeft     = editor.scrollLeft;
+  highlightLayer.scrollTop  = editor.scrollTop;
+  highlightLayer.scrollLeft = editor.scrollLeft;
+  gutter.scrollTop          = editor.scrollTop;
   if (floatingCard.classList.contains("show")) positionFloatingCard();
 });
 
@@ -1455,12 +1910,31 @@ function updateGutter() {
   const lineCount = editor.value.split("\n").length || 1;
   const lines = [];
   for (let i = 1; i <= lineCount; i++) lines.push(i);
-  // Join without a trailing newline — otherwise white-space:pre renders an
-  // extra empty line that misaligns with the textarea.
   gutter.textContent = lines.join("\n");
 }
 
-// ── Persistence (localStorage) ───────────────────────────────────
+// ── Syntax highlighting ──────────────────────────────────────────
+const highlightAvailable = () => !window.__hljsFailed && typeof hljs !== "undefined";
+let lastHighlightedText = null;
+function updateHighlight() {
+  if (!highlightAvailable()) {
+    editorContent.classList.add("no-hl");
+    return;
+  }
+  const code = editor.value;
+  if (code === lastHighlightedText) return;
+  lastHighlightedText = code;
+  // Trailing newline trick: textarea handles a final blank line, but <pre>
+  // collapses the trailing \n. Add a sentinel so the layers stay aligned.
+  const padded = code.endsWith("\n") ? code + " " : code;
+  try {
+    highlightCode.innerHTML = hljs.highlight(padded, { language: "python", ignoreIllegals: true }).value;
+  } catch {
+    highlightCode.textContent = padded;
+  }
+}
+
+// ── Persistence (editor content) ─────────────────────────────────
 let saveTimer = null;
 function saveSoon() {
   clearTimeout(saveTimer);
@@ -1477,15 +1951,159 @@ function restore() {
 }
 window.addEventListener("beforeunload", saveNow);
 
-// ── Reposition floating card on window resize ────────────────────
+// ── Window resize ────────────────────────────────────────────────
 window.addEventListener("resize", () => {
   if (floatingCard.classList.contains("show")) positionFloatingCard();
 });
 
+// ── Resizable side panel ─────────────────────────────────────────
+let dragging = false, dragStartX = 0, dragStartW = 0;
+function currentSideWidth() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue("--side-width").trim();
+  return parseInt(v, 10) || 340;
+}
+function setSideWidth(w) {
+  w = Math.max(0, Math.min(720, w));
+  document.documentElement.style.setProperty("--side-width", w + "px");
+  try { localStorage.setItem(SIDE_WIDTH_KEY, String(w)); } catch {}
+  if (floatingCard.classList.contains("show")) positionFloatingCard();
+}
+resizeHandle.addEventListener("mousedown", (e) => {
+  dragging = true;
+  dragStartX = e.clientX;
+  dragStartW = currentSideWidth();
+  resizeHandle.classList.add("dragging");
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+  e.preventDefault();
+});
+document.addEventListener("mousemove", (e) => {
+  if (!dragging) return;
+  const dx = dragStartX - e.clientX;  // drag left → side wider
+  setSideWidth(dragStartW + dx);
+});
+document.addEventListener("mouseup", () => {
+  if (!dragging) return;
+  dragging = false;
+  resizeHandle.classList.remove("dragging");
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+});
+let lastSideWidth = 340;
+resizeHandle.addEventListener("dblclick", () => {
+  const w = currentSideWidth();
+  if (w > 8) { lastSideWidth = w; setSideWidth(0); }
+  else       { setSideWidth(lastSideWidth || 340); }
+});
+
+// ── Settings drawer ──────────────────────────────────────────────
+function openDrawer() {
+  settingsDrawer.classList.add("show");
+  drawerBackdrop.classList.add("show");
+  settingsDrawer.setAttribute("aria-hidden", "false");
+}
+function closeDrawer() {
+  settingsDrawer.classList.remove("show");
+  drawerBackdrop.classList.remove("show");
+  settingsDrawer.setAttribute("aria-hidden", "true");
+  editor.focus();
+}
+settingsBtn.addEventListener("click", openDrawer);
+settingsClose.addEventListener("click", closeDrawer);
+drawerBackdrop.addEventListener("click", closeDrawer);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && settingsDrawer.classList.contains("show")) {
+    e.preventDefault();
+    closeDrawer();
+  }
+});
+
+function reflectSettingsToUI() {
+  setDebounce.value = settings.debounceMs;
+  setDebounceVal.textContent = `${settings.debounceMs} ms`;
+  setMaxtok.value = settings.maxNewTokens;
+  setMaxtokVal.textContent = String(settings.maxNewTokens);
+  setRetrigger.checked = settings.autoRetrigger;
+  setBrackets.checked = settings.bracketAutoClose;
+}
+setDebounce.addEventListener("input", () => {
+  settings.debounceMs = parseInt(setDebounce.value, 10);
+  setDebounceVal.textContent = `${settings.debounceMs} ms`;
+  saveSettings();
+});
+setMaxtok.addEventListener("input", () => {
+  settings.maxNewTokens = parseInt(setMaxtok.value, 10);
+  setMaxtokVal.textContent = String(settings.maxNewTokens);
+  saveSettings();
+});
+setRetrigger.addEventListener("change", () => {
+  settings.autoRetrigger = setRetrigger.checked;
+  saveSettings();
+});
+setBrackets.addEventListener("change", () => {
+  settings.bracketAutoClose = setBrackets.checked;
+  saveSettings();
+});
+
+// ── Session metrics ──────────────────────────────────────────────
+function updateSessionMetrics() {
+  const shownTotal = session.shown.inline + session.shown.collapsed + session.shown.hidden;
+  const acceptedTotal = session.accepted.full + session.accepted.word;
+  const rejectedTotal = session.rejected.esc + session.rejected.typed;
+  const visibleShown = session.shown.inline + session.shown.collapsed;  // hidden = suppressed, not "shown" interactively
+
+  mShown.textContent          = shownTotal;
+  mShownInline.textContent    = session.shown.inline;
+  mShownCollapsed.textContent = session.shown.collapsed;
+  mShownHidden.textContent    = session.shown.hidden;
+  mAccepted.textContent       = acceptedTotal;
+  mAcceptedFull.textContent   = session.accepted.full;
+  mAcceptedWord.textContent   = session.accepted.word;
+  mRejected.textContent       = rejectedTotal;
+  mRejectedEsc.textContent    = session.rejected.esc;
+  mRejectedTyped.textContent  = session.rejected.typed;
+
+  if (visibleShown > 0) {
+    mRate.textContent = `${((acceptedTotal / visibleShown) * 100).toFixed(0)}%`;
+  } else {
+    mRate.textContent = "—";
+  }
+}
+function updateSessionElapsed() {
+  const sec = Math.floor((Date.now() - session.startTime) / 1000);
+  const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+  const ss = String(sec % 60).padStart(2, "0");
+  sessionElapsed.textContent = `${mm}:${ss}`;
+}
+setInterval(updateSessionElapsed, 1000);
+
+resetSessionBtn.addEventListener("click", () => {
+  session.startTime = Date.now();
+  session.shown    = { inline: 0, collapsed: 0, hidden: 0 };
+  session.accepted = { full: 0, word: 0 };
+  session.rejected = { esc: 0, typed: 0 };
+  updateSessionMetrics();
+  updateSessionElapsed();
+});
+
 // ── Init ─────────────────────────────────────────────────────────
+loadSettings();
+reflectSettingsToUI();
+// Reflect persisted thresholds into sliders (not just defaults)
+highSlider.value = Math.round(thresholds.high * 100);
+lowSlider.value  = Math.round(thresholds.low  * 100);
+
 restore();
+applyThresholds();
 updateGutter();
+updateHighlight();
 refreshCopyBtn();
+updateSessionMetrics();
+updateSessionElapsed();
+
+// If hljs failed at parse time, mark the editor so text is shown directly.
+if (!highlightAvailable()) editorContent.classList.add("no-hl");
+
 editor.focus();
 </script>
 </body>
