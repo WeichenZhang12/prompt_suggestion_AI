@@ -4,45 +4,133 @@
 <meta charset="UTF-8">
 <title>AI Code Completion</title>
 <style>
+  /* ── Design tokens (macOS Dark) ───────────────────────────── */
+  :root {
+    --bg:           #1c1c1e;
+    --bg-sidebar:   #1f1f21;
+    --card:         #2c2c2e;
+    --separator:    rgba(255,255,255,0.08);
+    --text-1:       rgba(255,255,255,0.92);
+    --text-2:       rgba(255,255,255,0.55);
+    --text-3:       rgba(255,255,255,0.32);
+    --accent:       #0a84ff;
+    --accent-hover: #409cff;
+    --green:        #30d158;
+    --yellow:       #ffd60a;
+    --orange:       #ff9f0a;
+    --red:          #ff453a;
+    --gray:         #8e8e93;
+  }
+
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: #1e1e1e;
-    color: #d4d4d4;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+                 "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text-1);
     height: 100vh;
     display: flex;
     flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
+
+  /* ── Header ───────────────────────────────────────────────── */
   header {
-    padding: 12px 20px;
-    background: #252526;
-    border-bottom: 1px solid #333;
+    padding: 10px 18px;
+    background: rgba(28,28,30,0.72);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid var(--separator);
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
+    z-index: 10;
   }
-  header h1 { font-size: 14px; margin: 0; font-weight: 500; }
-  .status {
+  header h1 {
+    font-size: 13px;
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .right { margin-left: auto; }
+
+  /* ── Status pill (with colored dot) ───────────────────────── */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    color: var(--text-2);
+  }
+  .pill .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--gray);
+    flex-shrink: 0;
+  }
+  .pill.ok    { color: var(--green);  background: rgba(48,209,88,0.14); }
+  .pill.ok    .dot { background: var(--green); }
+  .pill.err   { color: var(--red);    background: rgba(255,69,58,0.16); }
+  .pill.err   .dot { background: var(--red); }
+  .pill.busy  { color: var(--yellow); background: rgba(255,214,10,0.14); }
+  .pill.busy  .dot { background: var(--yellow); animation: pulse 1.4s ease-in-out infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.35; transform: scale(0.78); }
+  }
+
+  /* ── Buttons ──────────────────────────────────────────────── */
+  button {
+    appearance: none;
+    border: 0;
+    cursor: pointer;
+    font-family: inherit;
     font-size: 12px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    background: #333;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #fff;
+    transition: background 120ms, transform 80ms, opacity 120ms;
   }
-  .status.ok { background: #16825d; }
-  .status.err { background: #a1260d; }
+  button:hover  { background: var(--accent-hover); }
+  button:active { transform: scale(0.97); }
+  button:disabled {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-3);
+    cursor: not-allowed;
+  }
+  button.secondary {
+    background: rgba(255,255,255,0.10);
+    color: var(--text-1);
+  }
+  button.secondary:hover { background: rgba(255,255,255,0.16); }
+  button.copied {
+    background: var(--green) !important;
+    color: #fff !important;
+  }
+
+  /* ── Layout ───────────────────────────────────────────────── */
   main {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 1px;
-    background: #333;
+    grid-template-columns: 1fr 340px;
     overflow: hidden;
   }
+
+  /* ── Editor pane ──────────────────────────────────────────── */
   .editor-pane {
     position: relative;
-    background: #1e1e1e;
+    background: var(--bg);
     overflow: hidden;
+    border-right: 1px solid var(--separator);
   }
   .editor-wrap {
     position: relative;
@@ -53,10 +141,10 @@
     position: absolute;
     inset: 0;
     margin: 0;
-    padding: 16px;
-    font-family: "SF Mono", "Menlo", "Monaco", monospace;
+    padding: 24px 28px;
+    font-family: "SF Mono", ui-monospace, "Menlo", "Monaco", monospace;
     font-size: 14px;
-    line-height: 1.5;
+    line-height: 1.55;
     white-space: pre-wrap;
     word-wrap: break-word;
     border: 0;
@@ -69,17 +157,175 @@
     user-select: none;
   }
   .ghost-suggestion {
-    color: #6b6b6b;
+    color: var(--text-3);
     font-style: italic;
   }
   .ghost-suggestion span,
   .suggestion-box span.tok {
-    /* per-token color is set inline; this keeps inheritance predictable */
     transition: color 150ms;
   }
+  textarea {
+    color: var(--text-1);
+    caret-color: var(--accent);
+    resize: none;
+    outline: none;
+  }
+  textarea::placeholder { color: var(--text-3); }
+
+  /* ── Floating activity chip in editor ─────────────────────── */
+  .activity-chip {
+    position: absolute;
+    bottom: 18px;
+    right: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 6px 10px;
+    background: rgba(44,44,46,0.82);
+    border: 1px solid var(--separator);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-2);
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
+    transition: opacity 220ms, transform 220ms;
+    z-index: 5;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
+  .activity-chip.show { opacity: 1; transform: translateY(0); }
+  .activity-chip .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--gray);
+  }
+  .activity-chip[data-state="thinking"]   { color: var(--yellow); }
+  .activity-chip[data-state="thinking"]   .dot { background: var(--yellow); animation: pulse 1.4s ease-in-out infinite; }
+  .activity-chip[data-state="generating"] { color: var(--accent); }
+  .activity-chip[data-state="generating"] .dot { background: var(--accent); animation: pulse 0.8s ease-in-out infinite; }
+  .activity-chip[data-state="ready"]      { color: var(--green); }
+  .activity-chip[data-state="ready"]      .dot { background: var(--green); }
+  .activity-chip[data-state="error"]      { color: var(--red); }
+  .activity-chip[data-state="error"]      .dot { background: var(--red); }
+
+  /* ── Side pane ────────────────────────────────────────────── */
+  .side-pane {
+    background: var(--bg-sidebar);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: auto;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 14px 14px 13px;
+  }
+  .card-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-2);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* Activity row inside the activity card */
+  .activity-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .activity-row .dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--gray);
+  }
+  .activity-row .label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-2);
+  }
+  .activity-row[data-state="thinking"]   .dot { background: var(--yellow); animation: pulse 1.4s ease-in-out infinite; }
+  .activity-row[data-state="thinking"]   .label { color: var(--yellow); }
+  .activity-row[data-state="generating"] .dot { background: var(--accent); animation: pulse 0.8s ease-in-out infinite; }
+  .activity-row[data-state="generating"] .label { color: var(--accent); }
+  .activity-row[data-state="ready"]      .dot { background: var(--green); }
+  .activity-row[data-state="ready"]      .label { color: var(--green); }
+  .activity-row[data-state="error"]      .dot { background: var(--red); }
+  .activity-row[data-state="error"]      .label { color: var(--red); }
+
+  /* Confidence meter */
+  .meter {
+    height: 5px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+  .meter-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--gray);
+    border-radius: 999px;
+    transition: width 250ms cubic-bezier(0.32, 0.72, 0, 1), background 250ms;
+  }
+  .meter-fill.inline    { background: var(--green); }
+  .meter-fill.collapsed { background: var(--orange); }
+  .meter-fill.hidden    { background: var(--gray); }
+
+  /* UI mode badge */
+  .mode-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .mode-badge.inline    { background: rgba(48,209,88,0.16);  color: var(--green); }
+  .mode-badge.collapsed { background: rgba(255,159,10,0.16); color: var(--orange); }
+  .mode-badge.hidden    { background: rgba(255,255,255,0.08); color: var(--text-3); }
+
+  /* Suggestion box */
+  .suggestion-box {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--separator);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: "SF Mono", ui-monospace, "Menlo", monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: var(--text-1);
+    min-height: 60px;
+    margin-top: 10px;
+    max-height: 240px;
+    overflow: auto;
+  }
+  .suggestion-box.empty {
+    color: var(--text-3);
+    font-style: italic;
+    font-family: inherit;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Per-token legend */
   .legend-bar {
-    height: 6px;
-    border-radius: 3px;
+    height: 5px;
+    border-radius: 999px;
     background: linear-gradient(
       to right,
       hsl(0, 60%, 55%),
@@ -87,183 +333,193 @@
       hsl(80, 55%, 55%),
       hsl(120, 50%, 55%)
     );
-    margin-top: 6px;
+    margin-top: 10px;
   }
   .legend-labels {
     display: flex;
     justify-content: space-between;
     font-size: 10px;
-    color: #777;
+    color: var(--text-3);
     margin-top: 4px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.06em;
+    font-weight: 600;
   }
-  textarea {
-    color: #d4d4d4;
-    caret-color: #d4d4d4;
-    resize: none;
-    outline: none;
-  }
-  .side-pane {
-    background: #252526;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    overflow: auto;
-  }
-  .meter {
-    height: 6px;
-    background: #333;
-    border-radius: 3px;
-    overflow: hidden;
-    margin-top: 6px;
-  }
-  .meter-fill {
-    height: 100%;
-    width: 0%;
-    background: #6b6b6b;
-    transition: width 200ms, background 200ms;
-  }
-  .meter-fill.inline { background: #16825d; }
-  .meter-fill.collapsed { background: #b58900; }
-  .meter-fill.hidden { background: #555; }
-  .label-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 11px;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .mode-badge {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    background: #333;
-    text-transform: uppercase;
-  }
-  .mode-badge.inline { background: #16825d; color: #fff; }
-  .mode-badge.collapsed { background: #b58900; color: #000; }
-  .mode-badge.hidden { background: #555; color: #aaa; }
-  .suggestion-box {
-    background: #1e1e1e;
-    border: 1px solid #333;
-    border-radius: 4px;
-    padding: 12px;
-    font-family: "SF Mono", "Menlo", "Monaco", monospace;
-    font-size: 13px;
-    line-height: 1.4;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    color: #d4d4d4;
-    min-height: 60px;
-    margin-top: 6px;
-  }
-  .suggestion-box.empty {
-    color: #555;
-    font-style: italic;
-    font-family: inherit;
-    font-size: 12px;
-  }
-  button {
-    padding: 4px 10px;
-    background: #0e639c;
-    color: #fff;
-    border: 0;
-    border-radius: 3px;
-    font-size: 11px;
-    cursor: pointer;
-    text-transform: none;
-    letter-spacing: 0;
-  }
-  button:hover { background: #1177bb; }
-  button:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+  /* Hints */
   .hint {
-    font-size: 11px;
-    color: #666;
+    font-size: 11.5px;
+    color: var(--text-2);
     line-height: 1.6;
+    padding: 4px 4px 0;
   }
   kbd {
-    background: #333;
-    border: 1px solid #444;
-    border-radius: 3px;
-    padding: 1px 5px;
-    font-family: inherit;
-    font-size: 10px;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid var(--separator);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    color: var(--text-1);
   }
+
+  /* macOS-style scrollbars */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.12);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.22); }
+  ::-webkit-scrollbar-track { background: transparent; }
 </style>
 </head>
 <body>
+
 <header>
   <h1>AI Code Completion</h1>
-  <span class="status" id="status">connecting…</span>
+  <span class="pill" id="status">
+    <span class="dot"></span>
+    <span id="status-text">connecting…</span>
+  </span>
+  <div class="right">
+    <button id="copy-btn" class="secondary" disabled>Copy code</button>
+  </div>
 </header>
+
 <main>
   <div class="editor-pane">
     <div class="editor-wrap">
       <div class="ghost-layer" id="ghost"><span id="ghost-prefix"></span><span class="ghost-suggestion" id="ghost-suggestion"></span></div>
-      <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Start typing Python here…&#10;e.g.  def sort_list(arr):&#10;          "></textarea>
+      <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"
+        placeholder="Start typing Python here…&#10;&#10;def sort_list(arr):&#10;    "></textarea>
+
+      <div class="activity-chip" id="activity-chip" data-state="idle">
+        <span class="dot"></span>
+        <span id="activity-chip-text">Idle</span>
+      </div>
     </div>
   </div>
+
   <aside class="side-pane">
-    <div>
-      <div class="label-row">
+
+    <div class="card">
+      <div class="card-label"><span>AI Activity</span></div>
+      <div class="activity-row" id="activity-row" data-state="idle">
+        <span class="dot"></span>
+        <span class="label" id="activity-text">Idle</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">
         <span>Confidence</span>
         <span id="confidence-num">—</span>
       </div>
       <div class="meter"><div class="meter-fill" id="meter-fill"></div></div>
     </div>
-    <div>
-      <div class="label-row">
+
+    <div class="card">
+      <div class="card-label">
         <span>UI Mode</span>
         <span class="mode-badge" id="mode-badge">—</span>
       </div>
     </div>
-    <div>
-      <div class="label-row">
+
+    <div class="card">
+      <div class="card-label">
         <span>Suggestion</span>
         <button id="accept-btn" disabled>Accept</button>
       </div>
       <div class="suggestion-box empty" id="suggestion-box">No suggestion yet.</div>
     </div>
-    <div>
-      <div class="label-row">
-        <span>Per-token confidence</span>
-      </div>
+
+    <div class="card">
+      <div class="card-label"><span>Per-token confidence</span></div>
       <div class="legend-bar"></div>
       <div class="legend-labels">
         <span>uncertain</span>
         <span>confident</span>
       </div>
     </div>
+
     <div class="hint">
       <kbd>Tab</kbd> accept &nbsp;·&nbsp; <kbd>Esc</kbd> dismiss<br><br>
       Inline ghost text appears when confidence ≥ 0.80.
       Mid-confidence suggestions show only in this panel.
       Low-confidence suggestions are suppressed.
     </div>
+
   </aside>
 </main>
 
 <script>
 const API_BASE = "http://localhost:8000";
 
-const editor          = document.getElementById("editor");
-const ghostLayer      = document.getElementById("ghost");
-const ghostPrefix     = document.getElementById("ghost-prefix");
-const ghostSuggestion = document.getElementById("ghost-suggestion");
-const statusEl        = document.getElementById("status");
-const confidenceNum   = document.getElementById("confidence-num");
-const meterFill       = document.getElementById("meter-fill");
-const modeBadge       = document.getElementById("mode-badge");
-const suggestionBox   = document.getElementById("suggestion-box");
-const acceptBtn       = document.getElementById("accept-btn");
+const editor           = document.getElementById("editor");
+const ghostLayer       = document.getElementById("ghost");
+const ghostPrefix      = document.getElementById("ghost-prefix");
+const ghostSuggestion  = document.getElementById("ghost-suggestion");
+const statusEl         = document.getElementById("status");
+const statusText       = document.getElementById("status-text");
+const confidenceNum    = document.getElementById("confidence-num");
+const meterFill        = document.getElementById("meter-fill");
+const modeBadge        = document.getElementById("mode-badge");
+const suggestionBox    = document.getElementById("suggestion-box");
+const acceptBtn        = document.getElementById("accept-btn");
+const copyBtn          = document.getElementById("copy-btn");
+const activityChip     = document.getElementById("activity-chip");
+const activityChipText = document.getElementById("activity-chip-text");
+const activityRow      = document.getElementById("activity-row");
+const activityText     = document.getElementById("activity-text");
 
 let currentSuggestion = null;
 let debounceTimer = null;
 let inflight = null;
+let readyTimer = null;
+
+// ── AI activity state machine ─────────────────────────────────
+//   idle → thinking → generating → ready → idle
+//                                 ↘ error
+const STATE_LABELS = {
+  idle:       "Idle",
+  thinking:   "Thinking…",
+  generating: "Generating…",
+  ready:      "Suggestion ready",
+  error:      "Error",
+};
+
+function setAiState(state) {
+  clearTimeout(readyTimer);
+  const label = STATE_LABELS[state] ?? state;
+
+  activityRow.dataset.state = state;
+  activityText.textContent = label;
+
+  activityChip.dataset.state = state;
+  activityChipText.textContent = label;
+
+  // Chip is only visible during active states; idle hides it
+  if (state === "idle") activityChip.classList.remove("show");
+  else                  activityChip.classList.add("show");
+
+  // Auto-fade "ready" back to idle after 1.6s so it doesn't linger
+  if (state === "ready") {
+    readyTimer = setTimeout(() => setAiState("idle"), 1600);
+  }
+}
+
+// Cancel anything pending — used on Esc / Accept so a stale request
+// can't pop a suggestion back up after the user dismissed it.
+function cancelPending() {
+  clearTimeout(debounceTimer);
+  if (inflight) {
+    inflight.abort();
+    inflight = null;
+  }
+}
 
 // ── Health check (poll until model loaded) ────────────────────
 async function checkHealth() {
@@ -271,16 +527,16 @@ async function checkHealth() {
     const r = await fetch(`${API_BASE}/health`);
     const j = await r.json();
     if (j.model_loaded) {
-      statusEl.textContent = "model loaded";
-      statusEl.className = "status ok";
+      statusText.textContent = "Model loaded";
+      statusEl.className = "pill ok";
     } else {
-      statusEl.textContent = "model loading…";
-      statusEl.className = "status";
+      statusText.textContent = "Loading model…";
+      statusEl.className = "pill busy";
       setTimeout(checkHealth, 2000);
     }
   } catch {
-    statusEl.textContent = "backend unreachable";
-    statusEl.className = "status err";
+    statusText.textContent = "Backend offline";
+    statusEl.className = "pill err";
     setTimeout(checkHealth, 3000);
   }
 }
@@ -311,25 +567,20 @@ async function requestCompletion(prefix) {
   }
 }
 
-// ── Color a single token by its log-prob ──────────────────────
-// prob = exp(logprob), in (0, 1].  Map prob → hue 0(red)…120(green).
-// Lightness stays muted so colors still feel like ghost/IDE text.
+// ── Per-token color (heatmap) ─────────────────────────────────
 function colorForLogprob(logprob) {
   const prob = Math.exp(logprob);
   const hue = Math.round(prob * 120);            // 0 = red, 120 = green
   return `hsl(${hue}, 60%, 60%)`;
 }
 
-// Build a DocumentFragment of per-token colored spans.
-// `dim` = ghost-style (slightly faded) for the inline overlay.
 function buildTokenSpans(tokens, { dim = false } = {}) {
   const frag = document.createDocumentFragment();
   for (const tok of tokens) {
     const span = document.createElement("span");
     span.textContent = tok.text;
     span.className = "tok";
-    const color = colorForLogprob(tok.logprob);
-    span.style.color = color;
+    span.style.color = colorForLogprob(tok.logprob);
     if (dim) span.style.opacity = "0.85";
     frag.appendChild(span);
   }
@@ -360,7 +611,6 @@ function renderSuggestion(prefix, s) {
     return;
   }
 
-  // Suggestion-box: colored per-token (or fallback to plain text)
   suggestionBox.className = "suggestion-box";
   if (tokenList.length > 0) {
     suggestionBox.replaceChildren(buildTokenSpans(tokenList));
@@ -369,7 +619,6 @@ function renderSuggestion(prefix, s) {
   }
   acceptBtn.disabled = false;
 
-  // Inline ghost overlay: only in "inline" mode, also colored per-token
   if (ui_mode === "inline") {
     ghostPrefix.textContent = prefix;
     if (tokenList.length > 0) {
@@ -402,13 +651,26 @@ editor.addEventListener("input", () => {
   clearSuggestion();
   clearTimeout(debounceTimer);
   const prefix = editor.value;
-  if (!prefix.trim()) return;
+  if (!prefix.trim()) {
+    setAiState("idle");
+    return;
+  }
+  setAiState("thinking");
   debounceTimer = setTimeout(async () => {
+    setAiState("generating");
     try {
       const result = await requestCompletion(prefix);
-      if (editor.value === prefix) renderSuggestion(prefix, result);
+      if (editor.value === prefix) {
+        renderSuggestion(prefix, result);
+        setAiState("ready");
+      } else {
+        // Editor changed mid-flight; a newer request will set the next state
+        setAiState("idle");
+      }
     } catch (e) {
-      if (e.name !== "AbortError") console.error(e);
+      if (e.name === "AbortError") return;   // superseded by a newer request
+      console.error(e);
+      setAiState("error");
     }
   }, 400);
 });
@@ -418,19 +680,51 @@ editor.addEventListener("keydown", (e) => {
   if (e.key === "Tab" && currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
     e.preventDefault();
     insertAtCursor(currentSuggestion.completion);
+    cancelPending();
     clearSuggestion();
+    setAiState("idle");
   } else if (e.key === "Escape") {
+    cancelPending();
     clearSuggestion();
+    setAiState("idle");
   }
 });
 
 acceptBtn.addEventListener("click", () => {
   if (currentSuggestion) {
     insertAtCursor(currentSuggestion.completion);
+    cancelPending();
     clearSuggestion();
+    setAiState("idle");
     editor.focus();
   }
 });
+
+// ── Copy entire editor contents to clipboard ──────────────────
+copyBtn.addEventListener("click", async () => {
+  const code = editor.value;
+  if (!code) return;
+  try {
+    await navigator.clipboard.writeText(code);
+  } catch {
+    editor.select();
+    document.execCommand("copy");
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+  }
+  const original = copyBtn.textContent;
+  copyBtn.textContent = "Copied!";
+  copyBtn.classList.add("copied");
+  setTimeout(() => {
+    copyBtn.textContent = original;
+    copyBtn.classList.remove("copied");
+  }, 1200);
+});
+
+function refreshCopyBtn() {
+  copyBtn.disabled = editor.value.length === 0;
+}
+editor.addEventListener("input", refreshCopyBtn);
+refreshCopyBtn();
 
 function insertAtCursor(text) {
   const start = editor.selectionStart;
