@@ -8,6 +8,7 @@
   :root {
     --bg:           #1c1c1e;
     --bg-sidebar:   #1f1f21;
+    --bg-gutter:    #1a1a1c;
     --card:         #2c2c2e;
     --separator:    rgba(255,255,255,0.08);
     --text-1:       rgba(255,255,255,0.92);
@@ -20,6 +21,13 @@
     --orange:       #ff9f0a;
     --red:          #ff453a;
     --gray:         #8e8e93;
+
+    /* Editor metrics — keep ghost layer + gutter perfectly aligned */
+    --code-font:    "SF Mono", ui-monospace, "Menlo", "Monaco", monospace;
+    --code-size:    14px;
+    --code-line:    1.55;
+    --pad-y:        24px;
+    --pad-x:        28px;
   }
 
   * { box-sizing: border-box; }
@@ -54,7 +62,7 @@
     font-weight: 600;
     letter-spacing: -0.01em;
   }
-  .right { margin-left: auto; }
+  .right { margin-left: auto; display: flex; gap: 8px; }
 
   /* ── Status pill (with colored dot) ───────────────────────── */
   .pill {
@@ -133,23 +141,64 @@
     border-right: 1px solid var(--separator);
   }
   .editor-wrap {
-    position: relative;
+    display: grid;
+    grid-template-columns: 48px 1fr;
     width: 100%;
     height: 100%;
   }
+
+  /* Line-number gutter */
+  .gutter {
+    background: var(--bg-gutter);
+    border-right: 1px solid var(--separator);
+    padding: var(--pad-y) 6px var(--pad-y) 0;
+    font-family: var(--code-font);
+    font-size: var(--code-size);
+    line-height: var(--code-line);
+    color: var(--text-3);
+    text-align: right;
+    user-select: none;
+    overflow: hidden;
+    white-space: pre;
+  }
+
+  /* Editor content area (textarea + ghost + floating card) */
+  .editor-content {
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 160ms;
+  }
+  .editor-content.focused {
+    box-shadow: inset 0 0 0 1px rgba(10,132,255,0.28);
+  }
+  .editor-content.accepted::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(48,209,88,0.10);
+    pointer-events: none;
+    animation: accept-flash 380ms ease-out;
+    z-index: 4;
+  }
+  @keyframes accept-flash {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
   .ghost-layer, textarea {
     position: absolute;
     inset: 0;
     margin: 0;
-    padding: 24px 28px;
-    font-family: "SF Mono", ui-monospace, "Menlo", "Monaco", monospace;
-    font-size: 14px;
-    line-height: 1.55;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+    padding: var(--pad-y) var(--pad-x);
+    font-family: var(--code-font);
+    font-size: var(--code-size);
+    line-height: var(--code-line);
+    white-space: pre;
+    word-wrap: normal;
     border: 0;
     background: transparent;
     overflow: auto;
+    tab-size: 4;
   }
   .ghost-layer {
     color: transparent;
@@ -160,7 +209,14 @@
     color: var(--text-3);
     font-style: italic;
   }
+  .ghost-suggestion.fade-out {
+    animation: ghost-out 200ms forwards;
+  }
+  @keyframes ghost-out {
+    to { opacity: 0; transform: translateX(8px); }
+  }
   .ghost-suggestion span,
+  .floating-card span.tok,
   .suggestion-box span.tok {
     transition: color 150ms;
   }
@@ -171,6 +227,83 @@
     outline: none;
   }
   textarea::placeholder { color: var(--text-3); }
+
+  /* Inline "Tab to accept" hint right after ghost text */
+  .tab-hint {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 7px 2px;
+    background: rgba(10,132,255,0.18);
+    color: var(--accent);
+    border-radius: 5px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    font-style: normal;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: 1px;
+    opacity: 0;
+    animation: hint-in 220ms 350ms forwards;
+  }
+  @keyframes hint-in {
+    from { opacity: 0; transform: translateX(-4px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ── Floating card (medium-confidence "collapsed" tier) ───── */
+  .floating-card {
+    position: absolute;
+    background: rgba(44,44,46,0.96);
+    border: 1px solid var(--separator);
+    border-left: 2px solid var(--orange);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-radius: 8px;
+    padding: 8px 11px 9px;
+    max-width: 480px;
+    min-width: 180px;
+    z-index: 6;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 180ms, transform 180ms;
+    pointer-events: auto;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  }
+  .floating-card.show { opacity: 1; transform: translateY(0); }
+  .floating-card.hidden { display: none; }
+  .floating-card .fc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 9.5px;
+    font-weight: 600;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    gap: 12px;
+  }
+  .floating-card .fc-header .keys kbd { margin-right: 2px; }
+  .floating-card .fc-body {
+    font-family: var(--code-font);
+    font-size: 12.5px;
+    line-height: 1.5;
+    white-space: pre;
+    color: var(--text-1);
+    overflow: hidden;
+    max-height: 1.5em;        /* collapsed: one line */
+    transition: max-height 220ms ease;
+  }
+  .floating-card.expanded .fc-body { max-height: 320px; overflow: auto; }
+  .floating-card .fc-more {
+    font-size: 10px;
+    color: var(--text-3);
+    margin-top: 5px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .floating-card .fc-more:hover { color: var(--text-2); }
 
   /* ── Floating activity chip in editor ─────────────────────── */
   .activity-chip {
@@ -211,7 +344,7 @@
   .activity-chip[data-state="error"]      { color: var(--red); }
   .activity-chip[data-state="error"]      .dot { background: var(--red); }
 
-  /* ── Side pane ────────────────────────────────────────────── */
+  /* ── Side pane (analytics view) ───────────────────────────── */
   .side-pane {
     background: var(--bg-sidebar);
     padding: 16px;
@@ -219,6 +352,14 @@
     flex-direction: column;
     gap: 12px;
     overflow: auto;
+  }
+  .side-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 4px -2px;
   }
   .card {
     background: var(--card);
@@ -261,6 +402,12 @@
   .activity-row[data-state="ready"]      .label { color: var(--green); }
   .activity-row[data-state="error"]      .dot { background: var(--red); }
   .activity-row[data-state="error"]      .label { color: var(--red); }
+  .activity-detail {
+    font-size: 11.5px;
+    color: var(--text-3);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
 
   /* Confidence meter */
   .meter {
@@ -269,6 +416,7 @@
     border-radius: 999px;
     overflow: hidden;
     margin-top: 10px;
+    position: relative;
   }
   .meter-fill {
     height: 100%;
@@ -280,6 +428,14 @@
   .meter-fill.inline    { background: var(--green); }
   .meter-fill.collapsed { background: var(--orange); }
   .meter-fill.hidden    { background: var(--gray); }
+  /* Threshold tick marks on the meter */
+  .meter-tick {
+    position: absolute;
+    top: -2px; bottom: -2px;
+    width: 1px;
+    background: rgba(255,255,255,0.45);
+    pointer-events: none;
+  }
 
   /* UI mode badge */
   .mode-badge {
@@ -296,13 +452,13 @@
   .mode-badge.collapsed { background: rgba(255,159,10,0.16); color: var(--orange); }
   .mode-badge.hidden    { background: rgba(255,255,255,0.08); color: var(--text-3); }
 
-  /* Suggestion box */
+  /* Suggestion box (per-token analysis) */
   .suggestion-box {
     background: rgba(0,0,0,0.25);
     border: 1px solid var(--separator);
     border-radius: 8px;
     padding: 12px 14px;
-    font-family: "SF Mono", ui-monospace, "Menlo", monospace;
+    font-family: var(--code-font);
     font-size: 12.5px;
     line-height: 1.5;
     white-space: pre-wrap;
@@ -321,6 +477,7 @@
     display: flex;
     align-items: center;
   }
+  .tok { cursor: help; }
 
   /* Per-token legend */
   .legend-bar {
@@ -346,11 +503,62 @@
     font-weight: 600;
   }
 
+  /* Threshold sliders */
+  .threshold-row {
+    margin-top: 12px;
+  }
+  .threshold-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    color: var(--text-2);
+    margin-bottom: 6px;
+  }
+  .threshold-label .name { display: flex; align-items: center; gap: 6px; }
+  .threshold-label .swatch {
+    width: 8px; height: 8px;
+    border-radius: 2px;
+  }
+  .threshold-label .swatch.high { background: var(--green); }
+  .threshold-label .swatch.low  { background: var(--orange); }
+  .threshold-label .val {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-1);
+    font-weight: 600;
+  }
+  input[type="range"] {
+    width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+    height: 4px;
+    background: rgba(255,255,255,0.10);
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--card);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--card);
+  }
+
   /* Hints */
   .hint {
     font-size: 11.5px;
     color: var(--text-2);
-    line-height: 1.6;
+    line-height: 1.7;
     padding: 4px 4px 0;
   }
   kbd {
@@ -359,10 +567,39 @@
     border-bottom-width: 2px;
     border-radius: 4px;
     padding: 1px 6px;
-    font-family: "SF Mono", ui-monospace, monospace;
+    font-family: var(--code-font);
     font-size: 10.5px;
     color: var(--text-1);
   }
+
+  /* Token hover tooltip (floats above the page) */
+  .tok-tooltip {
+    position: fixed;
+    background: rgba(28,28,30,0.96);
+    border: 1px solid var(--separator);
+    backdrop-filter: blur(20px);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: var(--code-font);
+    font-size: 11px;
+    color: var(--text-1);
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, 4px);
+    transition: opacity 120ms, transform 120ms;
+    z-index: 100;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    white-space: nowrap;
+  }
+  .tok-tooltip.show { opacity: 1; transform: translate(-50%, 0); }
+  .tok-tooltip .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .tok-tooltip .row + .row { margin-top: 2px; }
+  .tok-tooltip .key { color: var(--text-3); }
+  .tok-tooltip .val { color: var(--text-1); font-variant-numeric: tabular-nums; }
 
   /* macOS-style scrollbars */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -374,6 +611,16 @@
   }
   ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.22); }
   ::-webkit-scrollbar-track { background: transparent; }
+
+  /* Mirror div used by getCaretCoords (kept off-screen, never visible) */
+  .caret-mirror {
+    position: absolute;
+    top: 0; left: -9999px;
+    visibility: hidden;
+    white-space: pre;
+    word-wrap: normal;
+    overflow: hidden;
+  }
 </style>
 </head>
 <body>
@@ -385,6 +632,7 @@
     <span id="status-text">connecting…</span>
   </span>
   <div class="right">
+    <button id="clear-btn" class="secondary">Clear</button>
     <button id="copy-btn" class="secondary" disabled>Copy code</button>
   </div>
 </header>
@@ -392,18 +640,31 @@
 <main>
   <div class="editor-pane">
     <div class="editor-wrap">
-      <div class="ghost-layer" id="ghost"><span id="ghost-prefix"></span><span class="ghost-suggestion" id="ghost-suggestion"></span></div>
-      <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"
-        placeholder="Start typing Python here…&#10;&#10;def sort_list(arr):&#10;    "></textarea>
+      <div class="gutter" id="gutter"></div>
+      <div class="editor-content" id="editor-content">
+        <div class="ghost-layer" id="ghost"><span id="ghost-prefix"></span><span class="ghost-suggestion" id="ghost-suggestion"></span><span class="tab-hint" id="tab-hint" style="display:none">⇥ Tab</span></div>
+        <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"
+          placeholder="Start typing Python here…&#10;&#10;def sort_list(arr):&#10;    "></textarea>
 
-      <div class="activity-chip" id="activity-chip" data-state="idle">
-        <span class="dot"></span>
-        <span id="activity-chip-text">Idle</span>
+        <div class="floating-card hidden" id="floating-card">
+          <div class="fc-header">
+            <span>Suggestion · medium confidence</span>
+            <span class="keys"><kbd>Tab</kbd> accept <kbd>Esc</kbd> dismiss</span>
+          </div>
+          <div class="fc-body" id="floating-body"></div>
+          <div class="fc-more" id="floating-more" style="display:none"></div>
+        </div>
+
+        <div class="activity-chip" id="activity-chip" data-state="idle">
+          <span class="dot"></span>
+          <span id="activity-chip-text">Idle</span>
+        </div>
       </div>
     </div>
   </div>
 
   <aside class="side-pane">
+    <div class="side-title">Analytics</div>
 
     <div class="card">
       <div class="card-label"><span>AI Activity</span></div>
@@ -411,6 +672,7 @@
         <span class="dot"></span>
         <span class="label" id="activity-text">Idle</span>
       </div>
+      <div class="activity-detail" id="activity-detail"></div>
     </div>
 
     <div class="card">
@@ -418,7 +680,11 @@
         <span>Confidence</span>
         <span id="confidence-num">—</span>
       </div>
-      <div class="meter"><div class="meter-fill" id="meter-fill"></div></div>
+      <div class="meter">
+        <div class="meter-fill" id="meter-fill"></div>
+        <div class="meter-tick" id="tick-low"></div>
+        <div class="meter-tick" id="tick-high"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -429,15 +695,26 @@
     </div>
 
     <div class="card">
-      <div class="card-label">
-        <span>Suggestion</span>
-        <button id="accept-btn" disabled>Accept</button>
+      <div class="card-label"><span>Thresholds</span></div>
+      <div class="threshold-row">
+        <div class="threshold-label">
+          <span class="name"><span class="swatch high"></span>Inline (high)</span>
+          <span class="val" id="high-val">0.80</span>
+        </div>
+        <input type="range" id="high-slider" min="0" max="100" step="1" value="80">
       </div>
-      <div class="suggestion-box empty" id="suggestion-box">No suggestion yet.</div>
+      <div class="threshold-row">
+        <div class="threshold-label">
+          <span class="name"><span class="swatch low"></span>Show (low)</span>
+          <span class="val" id="low-val">0.40</span>
+        </div>
+        <input type="range" id="low-slider" min="0" max="100" step="1" value="40">
+      </div>
     </div>
 
     <div class="card">
       <div class="card-label"><span>Per-token confidence</span></div>
+      <div class="suggestion-box empty" id="suggestion-box">No suggestion yet.</div>
       <div class="legend-bar"></div>
       <div class="legend-labels">
         <span>uncertain</span>
@@ -446,43 +723,66 @@
     </div>
 
     <div class="hint">
-      <kbd>Tab</kbd> accept &nbsp;·&nbsp; <kbd>Esc</kbd> dismiss<br><br>
-      Inline ghost text appears when confidence ≥ 0.80.
-      Mid-confidence suggestions show only in this panel.
-      Low-confidence suggestions are suppressed.
+      <kbd>Tab</kbd> accept all &nbsp;·&nbsp; <kbd>Ctrl</kbd>+<kbd>→</kbd> accept word<br>
+      <kbd>Esc</kbd> dismiss &nbsp;·&nbsp; <kbd>Alt</kbd>+<kbd>\</kbd> peek collapsed
     </div>
-
   </aside>
 </main>
 
+<div class="tok-tooltip" id="tok-tooltip"></div>
+
 <script>
+"use strict";
+
 const API_BASE = "http://localhost:8000";
+const STORAGE_KEY = "promptsuggest.editor.v1";
+const CACHE_TTL_MS = 60_000;
+const CACHE_MAX = 50;
+const DEBOUNCE_MS = 400;
 
-const editor           = document.getElementById("editor");
-const ghostLayer       = document.getElementById("ghost");
-const ghostPrefix      = document.getElementById("ghost-prefix");
-const ghostSuggestion  = document.getElementById("ghost-suggestion");
-const statusEl         = document.getElementById("status");
-const statusText       = document.getElementById("status-text");
-const confidenceNum    = document.getElementById("confidence-num");
-const meterFill        = document.getElementById("meter-fill");
-const modeBadge        = document.getElementById("mode-badge");
-const suggestionBox    = document.getElementById("suggestion-box");
-const acceptBtn        = document.getElementById("accept-btn");
-const copyBtn          = document.getElementById("copy-btn");
-const activityChip     = document.getElementById("activity-chip");
-const activityChipText = document.getElementById("activity-chip-text");
-const activityRow      = document.getElementById("activity-row");
-const activityText     = document.getElementById("activity-text");
+// ── DOM refs ─────────────────────────────────────────────────────
+const editor          = document.getElementById("editor");
+const editorContent   = document.getElementById("editor-content");
+const gutter          = document.getElementById("gutter");
+const ghostLayer      = document.getElementById("ghost");
+const ghostPrefix     = document.getElementById("ghost-prefix");
+const ghostSuggestion = document.getElementById("ghost-suggestion");
+const tabHint         = document.getElementById("tab-hint");
+const floatingCard    = document.getElementById("floating-card");
+const floatingBody    = document.getElementById("floating-body");
+const floatingMore    = document.getElementById("floating-more");
+const statusEl        = document.getElementById("status");
+const statusText      = document.getElementById("status-text");
+const confidenceNum   = document.getElementById("confidence-num");
+const meterFill       = document.getElementById("meter-fill");
+const tickLow         = document.getElementById("tick-low");
+const tickHigh        = document.getElementById("tick-high");
+const modeBadge       = document.getElementById("mode-badge");
+const suggestionBox   = document.getElementById("suggestion-box");
+const copyBtn         = document.getElementById("copy-btn");
+const clearBtn        = document.getElementById("clear-btn");
+const activityChip    = document.getElementById("activity-chip");
+const activityChipText= document.getElementById("activity-chip-text");
+const activityRow     = document.getElementById("activity-row");
+const activityText    = document.getElementById("activity-text");
+const activityDetail  = document.getElementById("activity-detail");
+const highSlider      = document.getElementById("high-slider");
+const lowSlider       = document.getElementById("low-slider");
+const highVal         = document.getElementById("high-val");
+const lowVal          = document.getElementById("low-val");
+const tokTooltip      = document.getElementById("tok-tooltip");
 
-let currentSuggestion = null;
-let debounceTimer = null;
-let inflight = null;
-let readyTimer = null;
+// ── State ────────────────────────────────────────────────────────
+let currentSuggestion  = null;     // {completion, confidence, tokens, prefix}
+let debounceTimer      = null;
+let inflight           = null;     // AbortController of running fetch
+let inflightPrefix     = null;
+let readyTimer         = null;
+let lastInputType      = null;     // 'insert' | 'delete' | null
+let thresholds         = { high: 0.80, low: 0.40 };
+const responseCache    = new Map(); // prefix -> {result, ts}
 
-// ── AI activity state machine ─────────────────────────────────
-//   idle → thinking → generating → ready → idle
-//                                 ↘ error
+// ── AI activity state machine ────────────────────────────────────
 const STATE_LABELS = {
   idle:       "Idle",
   thinking:   "Thinking…",
@@ -491,37 +791,56 @@ const STATE_LABELS = {
   error:      "Error",
 };
 
-function setAiState(state) {
+function setAiState(state, detail = "") {
   clearTimeout(readyTimer);
   const label = STATE_LABELS[state] ?? state;
 
   activityRow.dataset.state = state;
   activityText.textContent = label;
+  activityDetail.textContent = detail;
 
   activityChip.dataset.state = state;
   activityChipText.textContent = label;
 
-  // Chip is only visible during active states; idle hides it
   if (state === "idle") activityChip.classList.remove("show");
   else                  activityChip.classList.add("show");
 
-  // Auto-fade "ready" back to idle after 1.6s so it doesn't linger
   if (state === "ready") {
     readyTimer = setTimeout(() => setAiState("idle"), 1600);
   }
 }
 
-// Cancel anything pending — used on Esc / Accept so a stale request
-// can't pop a suggestion back up after the user dismissed it.
+// ── Cache ────────────────────────────────────────────────────────
+function cacheGet(prefix) {
+  const e = responseCache.get(prefix);
+  if (!e) return null;
+  if (Date.now() - e.ts > CACHE_TTL_MS) {
+    responseCache.delete(prefix);
+    return null;
+  }
+  // LRU bump
+  responseCache.delete(prefix);
+  responseCache.set(prefix, e);
+  return e.result;
+}
+function cacheSet(prefix, result) {
+  responseCache.set(prefix, { result, ts: Date.now() });
+  while (responseCache.size > CACHE_MAX) {
+    responseCache.delete(responseCache.keys().next().value);
+  }
+}
+
+// ── Cancel anything pending (Esc, Accept, mode change) ───────────
 function cancelPending() {
   clearTimeout(debounceTimer);
   if (inflight) {
     inflight.abort();
     inflight = null;
+    inflightPrefix = null;
   }
 }
 
-// ── Health check (poll until model loaded) ────────────────────
+// ── Health check (poll until model loaded) ───────────────────────
 async function checkHealth() {
   try {
     const r = await fetch(`${API_BASE}/health`);
@@ -542,35 +861,83 @@ async function checkHealth() {
 }
 checkHealth();
 
-// ── Keep ghost layer scroll in sync with textarea ─────────────
-editor.addEventListener("scroll", () => {
-  ghostLayer.scrollTop = editor.scrollTop;
-  ghostLayer.scrollLeft = editor.scrollLeft;
-});
+// ── Caret coords helper (mirror-div technique) ───────────────────
+const mirrorDiv = document.createElement("div");
+mirrorDiv.className = "caret-mirror";
+document.body.appendChild(mirrorDiv);
 
-// ── Call backend ──────────────────────────────────────────────
-async function requestCompletion(prefix) {
-  if (inflight) inflight.abort();
-  const ctrl = new AbortController();
-  inflight = ctrl;
-  try {
-    const r = await fetch(`${API_BASE}/api/complete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prefix, max_new_tokens: 64 }),
-      signal: ctrl.signal,
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return await r.json();
-  } finally {
-    if (inflight === ctrl) inflight = null;
-  }
+const COPY_PROPS = [
+  "boxSizing","width","height","overflowX","overflowY",
+  "paddingTop","paddingRight","paddingBottom","paddingLeft",
+  "borderTopWidth","borderRightWidth","borderBottomWidth","borderLeftWidth",
+  "fontFamily","fontSize","fontWeight","fontStyle","fontVariant",
+  "fontStretch","fontVariationSettings",
+  "lineHeight","letterSpacing","textAlign","textTransform",
+  "whiteSpace","wordWrap","wordBreak","wordSpacing","tabSize",
+];
+
+function getCaretCoords(input, position) {
+  const styles = getComputedStyle(input);
+  // Reset and copy styles
+  mirrorDiv.removeAttribute("style");
+  mirrorDiv.className = "caret-mirror";
+  for (const p of COPY_PROPS) mirrorDiv.style[p] = styles[p];
+
+  const text = input.value.slice(0, position);
+  mirrorDiv.textContent = text;
+
+  const span = document.createElement("span");
+  span.textContent = input.value.charAt(position) || ".";
+  mirrorDiv.appendChild(span);
+
+  const inputRect  = input.getBoundingClientRect();
+  const mirrorRect = mirrorDiv.getBoundingClientRect();
+  const spanRect   = span.getBoundingClientRect();
+
+  // The span sits at the caret location inside the mirror.
+  // Position relative to mirror's border box = position relative to input's border box.
+  const top  = (spanRect.top  - mirrorRect.top)  - input.scrollTop;
+  const left = (spanRect.left - mirrorRect.left) - input.scrollLeft;
+  const lineHeight = parseFloat(styles.lineHeight) || (parseFloat(styles.fontSize) * 1.4);
+
+  return { top, left, lineHeight, inputRect };
 }
 
-// ── Per-token color (heatmap) ─────────────────────────────────
+function positionFloatingCard() {
+  if (floatingCard.classList.contains("hidden")) return;
+  const caret = getCaretCoords(editor, editor.selectionStart);
+  const contentRect = editorContent.getBoundingClientRect();
+  const editorRect  = caret.inputRect;
+
+  // Caret coords are relative to textarea's border box.
+  // Convert to editor-content's coordinate space.
+  let left = (editorRect.left - contentRect.left) + caret.left;
+  let top  = (editorRect.top  - contentRect.top)  + caret.top + caret.lineHeight + 4;
+
+  // Measure card to clamp
+  floatingCard.style.left = "0px";
+  floatingCard.style.top  = "0px";
+  const cardRect = floatingCard.getBoundingClientRect();
+
+  const maxLeft = contentRect.width - cardRect.width - 8;
+  if (left > maxLeft) left = Math.max(8, maxLeft);
+  if (left < 8) left = 8;
+
+  // If the card would go off the bottom, flip above the caret line
+  const wouldOverflowBottom = top + cardRect.height > contentRect.height - 8;
+  if (wouldOverflowBottom) {
+    top = (editorRect.top - contentRect.top) + caret.top - cardRect.height - 4;
+    if (top < 8) top = 8;
+  }
+
+  floatingCard.style.left = left + "px";
+  floatingCard.style.top  = top  + "px";
+}
+
+// ── Per-token color (heatmap) ────────────────────────────────────
 function colorForLogprob(logprob) {
   const prob = Math.exp(logprob);
-  const hue = Math.round(prob * 120);            // 0 = red, 120 = green
+  const hue = Math.round(prob * 120);             // 0=red → 120=green
   return `hsl(${hue}, 60%, 60%)`;
 }
 
@@ -582,32 +949,42 @@ function buildTokenSpans(tokens, { dim = false } = {}) {
     span.className = "tok";
     span.style.color = colorForLogprob(tok.logprob);
     if (dim) span.style.opacity = "0.85";
+    span.dataset.logprob = String(tok.logprob);
     frag.appendChild(span);
   }
   return frag;
 }
 
-// ── Render the three UI tiers ─────────────────────────────────
+// ── Threshold-driven UI mode (overrides server's value) ──────────
+function uiModeFor(confidence) {
+  if (confidence >= thresholds.high) return "inline";
+  if (confidence >= thresholds.low)  return "collapsed";
+  return "hidden";
+}
+
+// ── Render the three UI tiers ────────────────────────────────────
 function renderSuggestion(prefix, s) {
+  if (!s || !s.completion) { clearSuggestion(); return; }
+  s = { ...s, prefix };
   currentSuggestion = s;
 
-  if (!s || !s.completion) { clearSuggestion(); return; }
-
-  const { completion, confidence, ui_mode, tokens } = s;
+  const { completion, confidence, tokens } = s;
   const tokenList = Array.isArray(tokens) ? tokens : [];
+  const ui_mode = uiModeFor(confidence);
+  s.ui_mode = ui_mode;
 
-  confidenceNum.textContent = confidence.toFixed(3);
+  // Always update analytics panel
+  confidenceNum.textContent = `${(confidence * 100).toFixed(1)}%`;
   meterFill.style.width = `${Math.min(confidence * 100, 100)}%`;
   meterFill.className = `meter-fill ${ui_mode}`;
   modeBadge.textContent = ui_mode;
   modeBadge.className = `mode-badge ${ui_mode}`;
 
   if (ui_mode === "hidden") {
-    suggestionBox.textContent = "Suppressed (confidence too low).";
+    suggestionBox.textContent = "Suppressed (confidence below threshold).";
     suggestionBox.className = "suggestion-box empty";
-    ghostPrefix.textContent = "";
-    ghostSuggestion.replaceChildren();
-    acceptBtn.disabled = true;
+    hideGhost();
+    hideFloating();
     return;
   }
 
@@ -617,25 +994,76 @@ function renderSuggestion(prefix, s) {
   } else {
     suggestionBox.textContent = completion;
   }
-  acceptBtn.disabled = false;
 
-  if (ui_mode === "inline") {
-    ghostPrefix.textContent = prefix;
-    if (tokenList.length > 0) {
-      ghostSuggestion.replaceChildren(buildTokenSpans(tokenList, { dim: true }));
-    } else {
-      ghostSuggestion.textContent = completion;
-    }
+  if (ui_mode === "inline" && cursorIsAtPrefixEnd(prefix) && cursorIsAtEndOfLine()) {
+    showGhost(prefix, completion, tokenList);
+    hideFloating();
+  } else if (ui_mode === "inline") {
+    // Inline allowed by confidence, but cursor moved or not at EOL → fall back to floating
+    hideGhost();
+    showFloating(completion, tokenList);
   } else {
-    ghostPrefix.textContent = "";
-    ghostSuggestion.replaceChildren();
+    // collapsed
+    hideGhost();
+    showFloating(completion, tokenList);
   }
+}
+
+function showGhost(prefix, completion, tokens) {
+  ghostPrefix.textContent = prefix;
+  if (tokens.length > 0) {
+    ghostSuggestion.replaceChildren(buildTokenSpans(tokens, { dim: true }));
+  } else {
+    ghostSuggestion.textContent = completion;
+  }
+  ghostSuggestion.classList.remove("fade-out");
+  // Tab hint shows next to ghost text after a short delay
+  tabHint.style.display = "inline-block";
+}
+
+function hideGhost() {
+  ghostPrefix.textContent = "";
+  ghostSuggestion.replaceChildren();
+  ghostSuggestion.classList.remove("fade-out");
+  tabHint.style.display = "none";
+}
+
+function showFloating(completion, tokens) {
+  floatingCard.classList.remove("hidden", "expanded");
+  if (tokens.length > 0) {
+    floatingBody.replaceChildren(buildTokenSpans(tokens));
+  } else {
+    floatingBody.textContent = completion;
+  }
+  // Multi-line indicator
+  const lines = completion.split("\n");
+  if (lines.length > 1) {
+    floatingMore.textContent = `▾ +${lines.length - 1} more line${lines.length > 2 ? "s" : ""} · Alt+\\ to expand`;
+    floatingMore.style.display = "block";
+  } else {
+    floatingMore.style.display = "none";
+  }
+  // Position then reveal
+  requestAnimationFrame(() => {
+    positionFloatingCard();
+    floatingCard.classList.add("show");
+  });
+}
+
+function hideFloating() {
+  floatingCard.classList.remove("show", "expanded");
+  // Delay actual hide until transition finishes
+  setTimeout(() => {
+    if (!floatingCard.classList.contains("show")) {
+      floatingCard.classList.add("hidden");
+    }
+  }, 200);
 }
 
 function clearSuggestion() {
   currentSuggestion = null;
-  ghostPrefix.textContent = "";
-  ghostSuggestion.replaceChildren();
+  hideGhost();
+  hideFloating();
   confidenceNum.textContent = "—";
   meterFill.style.width = "0%";
   meterFill.className = "meter-fill";
@@ -643,64 +1071,341 @@ function clearSuggestion() {
   modeBadge.className = "mode-badge";
   suggestionBox.textContent = "No suggestion yet.";
   suggestionBox.className = "suggestion-box empty";
-  acceptBtn.disabled = true;
 }
 
-// ── Debounced typing → completion ─────────────────────────────
-editor.addEventListener("input", () => {
+// ── Trigger validity checks ──────────────────────────────────────
+function cursorIsAtPrefixEnd(prefix) {
+  // The suggestion was generated for `prefix`. It is only valid to render
+  // inline if the cursor is currently at exactly that position in the editor.
+  return editor.value.slice(0, editor.selectionStart) === prefix;
+}
+
+function cursorIsAtEndOfLine() {
+  const pos = editor.selectionStart;
+  const text = editor.value;
+  // Reject if there is non-whitespace between cursor and the next \n.
+  for (let i = pos; i < text.length; i++) {
+    const c = text[i];
+    if (c === "\n") return true;
+    if (c !== " " && c !== "\t") return false;
+  }
+  return true;
+}
+
+function selectionIsCollapsed() {
+  return editor.selectionStart === editor.selectionEnd;
+}
+
+// ── Backend call ─────────────────────────────────────────────────
+async function requestCompletion(prefix) {
+  // Cache hit?
+  const cached = cacheGet(prefix);
+  if (cached) return cached;
+
+  // Same prefix already in flight? Just wait on it via the existing controller.
+  if (inflight && inflightPrefix === prefix) {
+    // Re-issue would be redundant; let it complete and fall through.
+    // (The original caller will resolve renderSuggestion.)
+  }
+
+  if (inflight) inflight.abort();
+  const ctrl = new AbortController();
+  inflight = ctrl;
+  inflightPrefix = prefix;
+
+  try {
+    const r = await fetch(`${API_BASE}/api/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix, max_new_tokens: 64 }),
+      signal: ctrl.signal,
+    });
+    if (!r.ok) {
+      if (r.status === 503) throw new HttpError(503, "Model still loading on server");
+      const text = await r.text().catch(() => "");
+      throw new HttpError(r.status, text || `HTTP ${r.status}`);
+    }
+    const json = await r.json();
+    cacheSet(prefix, json);
+    return json;
+  } finally {
+    if (inflight === ctrl) {
+      inflight = null;
+      inflightPrefix = null;
+    }
+  }
+}
+
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// ── Editor: typing → completion ──────────────────────────────────
+editor.addEventListener("input", (e) => {
+  // Tracker for delete/insert for trigger logic
+  lastInputType = (e.inputType || "").startsWith("delete") ? "delete" : "insert";
+
+  // Clear any previous suggestion immediately (it's stale)
   clearSuggestion();
   clearTimeout(debounceTimer);
-  const prefix = editor.value;
+  saveSoon();
+  updateGutter();
+  refreshCopyBtn();
+
+  const prefix = editor.value.slice(0, editor.selectionStart);
   if (!prefix.trim()) {
     setAiState("idle");
     return;
   }
+
+  // Don't pop suggestions while the user is deleting — that's annoying.
+  if (lastInputType === "delete") {
+    setAiState("idle");
+    return;
+  }
+
+  // Don't trigger if the user has a selection (they're about to overwrite).
+  if (!selectionIsCollapsed()) {
+    setAiState("idle");
+    return;
+  }
+
+  // Cache hit? Render instantly.
+  const cached = cacheGet(prefix);
+  if (cached) {
+    renderSuggestion(prefix, cached);
+    setAiState("ready");
+    return;
+  }
+
   setAiState("thinking");
   debounceTimer = setTimeout(async () => {
     setAiState("generating");
     try {
       const result = await requestCompletion(prefix);
-      if (editor.value === prefix) {
+      // Make sure the user's prefix hasn't moved since we kicked this off.
+      const currentPrefix = editor.value.slice(0, editor.selectionStart);
+      if (currentPrefix === prefix) {
         renderSuggestion(prefix, result);
         setAiState("ready");
       } else {
-        // Editor changed mid-flight; a newer request will set the next state
+        // Stale; leave state to whatever the next request sets.
         setAiState("idle");
       }
-    } catch (e) {
-      if (e.name === "AbortError") return;   // superseded by a newer request
-      console.error(e);
-      setAiState("error");
+    } catch (err) {
+      if (err.name === "AbortError") return;
+      console.error(err);
+      const detail = err instanceof HttpError
+        ? (err.status === 503 ? "Backend is still loading the model. Retry shortly."
+                              : `Server returned ${err.status}.`)
+        : "Cannot reach backend at " + API_BASE + ".";
+      setAiState("error", detail);
     }
-  }, 400);
+  }, DEBOUNCE_MS);
 });
 
-// ── Tab to accept, Esc to dismiss ─────────────────────────────
+// Cursor-only moves (arrow keys, click) should also clear stale ghosts
+editor.addEventListener("click", () => { syncSuggestionVisibility(); });
+editor.addEventListener("keyup", (e) => {
+  // For navigation keys, just re-check if existing ghost should still show
+  if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Home","End","PageUp","PageDown"].includes(e.key)) {
+    syncSuggestionVisibility();
+  }
+});
+
+function syncSuggestionVisibility() {
+  if (!currentSuggestion) return;
+  // If cursor moved away from where the suggestion was generated, hide ghost / floating
+  if (!cursorIsAtPrefixEnd(currentSuggestion.prefix)) {
+    hideGhost();
+    hideFloating();
+    return;
+  }
+  // Reposition floating card if it's showing
+  if (currentSuggestion.ui_mode === "collapsed" || floatingCard.classList.contains("show")) {
+    positionFloatingCard();
+  }
+}
+
+// ── Keyboard: Tab / Esc / Ctrl+→ / Alt+\ ─────────────────────────
 editor.addEventListener("keydown", (e) => {
+  // Alt+\: peek (expand floating card)
+  if (e.altKey && e.key === "\\" && currentSuggestion && !floatingCard.classList.contains("hidden")) {
+    e.preventDefault();
+    floatingCard.classList.toggle("expanded");
+    return;
+  }
+
+  // Ctrl+→ (or Cmd+→): accept first word of suggestion
+  if ((e.ctrlKey || e.metaKey) && e.key === "ArrowRight" && currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
+    if (acceptWord()) {
+      e.preventDefault();
+      return;
+    }
+  }
+
+  // Tab: accept full suggestion
   if (e.key === "Tab" && currentSuggestion && currentSuggestion.ui_mode !== "hidden") {
     e.preventDefault();
-    insertAtCursor(currentSuggestion.completion);
-    cancelPending();
-    clearSuggestion();
-    setAiState("idle");
-  } else if (e.key === "Escape") {
+    acceptFull();
+    return;
+  }
+
+  // Esc: dismiss
+  if (e.key === "Escape") {
     cancelPending();
     clearSuggestion();
     setAiState("idle");
   }
 });
 
-acceptBtn.addEventListener("click", () => {
+function acceptFull() {
+  if (!currentSuggestion) return;
+  const text = currentSuggestion.completion;
+  // Fade-out animation on ghost text, then insert
+  ghostSuggestion.classList.add("fade-out");
+  flashAccept();
+  setTimeout(() => {
+    insertAtCursor(text);
+    cancelPending();
+    clearSuggestion();
+    setAiState("idle");
+    saveSoon();
+    refreshCopyBtn();
+    updateGutter();
+  }, 90);
+}
+
+function acceptWord() {
+  if (!currentSuggestion) return false;
+  const text = currentSuggestion.completion;
+  // Match leading whitespace + first non-whitespace run, OR a run of whitespace alone.
+  const m = text.match(/^(\s*\S+|\s+)/);
+  if (!m) return false;
+  const piece = m[1];
+  insertAtCursor(piece);
+  flashAccept();
+  const remaining = text.slice(piece.length);
+  if (remaining.length === 0) {
+    cancelPending();
+    clearSuggestion();
+    setAiState("idle");
+  } else {
+    // Trim consumed tokens. We do this by character count; close enough since
+    // tokens are reflected verbatim in `completion`.
+    let consumed = piece.length;
+    const remainingTokens = [];
+    for (const t of currentSuggestion.tokens || []) {
+      if (consumed >= t.text.length) {
+        consumed -= t.text.length;
+        if (consumed === 0) continue;
+      } else if (consumed > 0) {
+        remainingTokens.push({ text: t.text.slice(consumed), logprob: t.logprob });
+        consumed = 0;
+      } else {
+        remainingTokens.push(t);
+      }
+    }
+    currentSuggestion.completion = remaining;
+    currentSuggestion.tokens = remainingTokens;
+    currentSuggestion.prefix = editor.value.slice(0, editor.selectionStart);
+    // Re-render with the new prefix anchor
+    renderSuggestion(currentSuggestion.prefix, currentSuggestion);
+  }
+  saveSoon();
+  refreshCopyBtn();
+  updateGutter();
+  return true;
+}
+
+function flashAccept() {
+  editorContent.classList.remove("accepted");
+  // Force reflow so the animation restarts
+  void editorContent.offsetWidth;
+  editorContent.classList.add("accepted");
+  setTimeout(() => editorContent.classList.remove("accepted"), 400);
+}
+
+function insertAtCursor(text) {
+  const start = editor.selectionStart;
+  const end = editor.selectionEnd;
+  editor.value = editor.value.slice(0, start) + text + editor.value.slice(end);
+  const pos = start + text.length;
+  editor.setSelectionRange(pos, pos);
+}
+
+// ── Floating card click → expand/collapse + accept on body click ─
+// preventDefault on mousedown so the textarea keeps focus (and its caret
+// position) when the user clicks the card.
+floatingCard.addEventListener("mousedown", (e) => e.preventDefault());
+floatingMore.addEventListener("click", () => {
+  floatingCard.classList.toggle("expanded");
+  positionFloatingCard();
+});
+floatingBody.addEventListener("click", () => {
+  if (currentSuggestion) acceptFull();
+});
+
+// ── Threshold sliders (reactive re-render) ───────────────────────
+function applyThresholds() {
+  // Clamp: low ≤ high
+  let high = parseInt(highSlider.value, 10) / 100;
+  let low  = parseInt(lowSlider.value,  10) / 100;
+  if (low > high) {
+    if (document.activeElement === lowSlider) {
+      high = low;
+      highSlider.value = Math.round(high * 100);
+    } else {
+      low = high;
+      lowSlider.value = Math.round(low * 100);
+    }
+  }
+  thresholds = { high, low };
+  highVal.textContent = high.toFixed(2);
+  lowVal.textContent  = low.toFixed(2);
+  tickHigh.style.left = `${high * 100}%`;
+  tickLow.style.left  = `${low  * 100}%`;
+  // Re-render existing suggestion with new thresholds
   if (currentSuggestion) {
-    insertAtCursor(currentSuggestion.completion);
-    cancelPending();
-    clearSuggestion();
-    setAiState("idle");
-    editor.focus();
+    renderSuggestion(currentSuggestion.prefix, currentSuggestion);
+  }
+}
+highSlider.addEventListener("input", applyThresholds);
+lowSlider.addEventListener("input",  applyThresholds);
+applyThresholds();
+
+// ── Token hover tooltip ──────────────────────────────────────────
+document.addEventListener("mouseover", (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLElement) || !t.classList.contains("tok")) return;
+  const lp = parseFloat(t.dataset.logprob);
+  if (Number.isNaN(lp)) return;
+  const prob = Math.exp(lp);
+  tokTooltip.innerHTML =
+    `<div class="row"><span class="key">prob</span><span class="val">${(prob*100).toFixed(2)}%</span></div>` +
+    `<div class="row"><span class="key">log p</span><span class="val">${lp.toFixed(3)}</span></div>` +
+    `<div class="row"><span class="key">token</span><span class="val">${escapeHtml(JSON.stringify(t.textContent))}</span></div>`;
+  const r = t.getBoundingClientRect();
+  tokTooltip.style.left = (r.left + r.width / 2) + "px";
+  tokTooltip.style.top  = (r.bottom + 6) + "px";
+  tokTooltip.classList.add("show");
+});
+document.addEventListener("mouseout", (e) => {
+  const t = e.target;
+  if (t instanceof HTMLElement && t.classList.contains("tok")) {
+    tokTooltip.classList.remove("show");
   }
 });
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
 
-// ── Copy entire editor contents to clipboard ──────────────────
+// ── Copy / Clear ─────────────────────────────────────────────────
 copyBtn.addEventListener("click", async () => {
   const code = editor.value;
   if (!code) return;
@@ -719,20 +1424,69 @@ copyBtn.addEventListener("click", async () => {
     copyBtn.classList.remove("copied");
   }, 1200);
 });
+function refreshCopyBtn() { copyBtn.disabled = editor.value.length === 0; }
 
-function refreshCopyBtn() {
-  copyBtn.disabled = editor.value.length === 0;
+clearBtn.addEventListener("click", () => {
+  if (!editor.value) return;
+  if (!confirm("Clear the editor?")) return;
+  editor.value = "";
+  cancelPending();
+  clearSuggestion();
+  saveNow();
+  updateGutter();
+  refreshCopyBtn();
+  editor.focus();
+});
+
+// ── Editor focus ring ────────────────────────────────────────────
+editor.addEventListener("focus", () => editorContent.classList.add("focused"));
+editor.addEventListener("blur",  () => editorContent.classList.remove("focused"));
+
+// ── Scroll sync (gutter + ghost layer + floating card) ───────────
+editor.addEventListener("scroll", () => {
+  ghostLayer.scrollTop  = editor.scrollTop;
+  ghostLayer.scrollLeft = editor.scrollLeft;
+  gutter.scrollTop      = editor.scrollTop;
+  if (floatingCard.classList.contains("show")) positionFloatingCard();
+});
+
+// ── Line-number gutter ───────────────────────────────────────────
+function updateGutter() {
+  const lineCount = editor.value.split("\n").length || 1;
+  const lines = [];
+  for (let i = 1; i <= lineCount; i++) lines.push(i);
+  // Join without a trailing newline — otherwise white-space:pre renders an
+  // extra empty line that misaligns with the textarea.
+  gutter.textContent = lines.join("\n");
 }
-editor.addEventListener("input", refreshCopyBtn);
+
+// ── Persistence (localStorage) ───────────────────────────────────
+let saveTimer = null;
+function saveSoon() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 400);
+}
+function saveNow() {
+  try { localStorage.setItem(STORAGE_KEY, editor.value); } catch {}
+}
+function restore() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) editor.value = saved;
+  } catch {}
+}
+window.addEventListener("beforeunload", saveNow);
+
+// ── Reposition floating card on window resize ────────────────────
+window.addEventListener("resize", () => {
+  if (floatingCard.classList.contains("show")) positionFloatingCard();
+});
+
+// ── Init ─────────────────────────────────────────────────────────
+restore();
+updateGutter();
 refreshCopyBtn();
-
-function insertAtCursor(text) {
-  const start = editor.selectionStart;
-  const end = editor.selectionEnd;
-  editor.value = editor.value.slice(0, start) + text + editor.value.slice(end);
-  const pos = start + text.length;
-  editor.setSelectionRange(pos, pos);
-}
+editor.focus();
 </script>
 </body>
 </html>
