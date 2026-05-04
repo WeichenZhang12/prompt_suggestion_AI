@@ -40,7 +40,7 @@ def complete(request: CompleteRequest):
         raise HTTPException(status_code=503, detail="Model not loaded yet.")
     
     try:
-        completion, confidence = model.generate(
+        completion, confidence, tokens = model.generate(
             prefix=request.prefix,
             max_new_tokens=request.max_new_tokens,
         )
@@ -60,4 +60,5 @@ def complete(request: CompleteRequest):
         completion=completion,
         confidence=round(confidence, 4),
         ui_mode=ui_mode,
+        tokens=tokens,
     )

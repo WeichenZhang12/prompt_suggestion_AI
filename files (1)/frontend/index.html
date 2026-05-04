@@ -72,6 +72,32 @@
     color: #6b6b6b;
     font-style: italic;
   }
+  .ghost-suggestion span,
+  .suggestion-box span.tok {
+    /* per-token color is set inline; this keeps inheritance predictable */
+    transition: color 150ms;
+  }
+  .legend-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(
+      to right,
+      hsl(0, 60%, 55%),
+      hsl(40, 60%, 55%),
+      hsl(80, 55%, 55%),
+      hsl(120, 50%, 55%)
+    );
+    margin-top: 6px;
+  }
+  .legend-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #777;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
   textarea {
     color: #d4d4d4;
     caret-color: #d4d4d4;
@@ -202,6 +228,16 @@
       </div>
       <div class="suggestion-box empty" id="suggestion-box">No suggestion yet.</div>
     </div>
+    <div>
+      <div class="label-row">
+        <span>Per-token confidence</span>
+      </div>
+      <div class="legend-bar"></div>
+      <div class="legend-labels">
+        <span>uncertain</span>
+        <span>confident</span>
+      </div>
+    </div>
     <div class="hint">
       <kbd>Tab</kbd> accept &nbsp;·&nbsp; <kbd>Esc</kbd> dismiss<br><br>
       Inline ghost text appears when confidence ≥ 0.80.
@@ -275,13 +311,39 @@ async function requestCompletion(prefix) {
   }
 }
 
+// ── Color a single token by its log-prob ──────────────────────
+// prob = exp(logprob), in (0, 1].  Map prob → hue 0(red)…120(green).
+// Lightness stays muted so colors still feel like ghost/IDE text.
+function colorForLogprob(logprob) {
+  const prob = Math.exp(logprob);
+  const hue = Math.round(prob * 120);            // 0 = red, 120 = green
+  return `hsl(${hue}, 60%, 60%)`;
+}
+
+// Build a DocumentFragment of per-token colored spans.
+// `dim` = ghost-style (slightly faded) for the inline overlay.
+function buildTokenSpans(tokens, { dim = false } = {}) {
+  const frag = document.createDocumentFragment();
+  for (const tok of tokens) {
+    const span = document.createElement("span");
+    span.textContent = tok.text;
+    span.className = "tok";
+    const color = colorForLogprob(tok.logprob);
+    span.style.color = color;
+    if (dim) span.style.opacity = "0.85";
+    frag.appendChild(span);
+  }
+  return frag;
+}
+
 // ── Render the three UI tiers ─────────────────────────────────
 function renderSuggestion(prefix, s) {
   currentSuggestion = s;
 
   if (!s || !s.completion) { clearSuggestion(); return; }
 
-  const { completion, confidence, ui_mode } = s;
+  const { completion, confidence, ui_mode, tokens } = s;
+  const tokenList = Array.isArray(tokens) ? tokens : [];
 
   confidenceNum.textContent = confidence.toFixed(3);
   meterFill.style.width = `${Math.min(confidence * 100, 100)}%`;
@@ -293,28 +355,38 @@ function renderSuggestion(prefix, s) {
     suggestionBox.textContent = "Suppressed (confidence too low).";
     suggestionBox.className = "suggestion-box empty";
     ghostPrefix.textContent = "";
-    ghostSuggestion.textContent = "";
+    ghostSuggestion.replaceChildren();
     acceptBtn.disabled = true;
     return;
   }
 
-  suggestionBox.textContent = completion;
+  // Suggestion-box: colored per-token (or fallback to plain text)
   suggestionBox.className = "suggestion-box";
+  if (tokenList.length > 0) {
+    suggestionBox.replaceChildren(buildTokenSpans(tokenList));
+  } else {
+    suggestionBox.textContent = completion;
+  }
   acceptBtn.disabled = false;
 
+  // Inline ghost overlay: only in "inline" mode, also colored per-token
   if (ui_mode === "inline") {
     ghostPrefix.textContent = prefix;
-    ghostSuggestion.textContent = completion;
+    if (tokenList.length > 0) {
+      ghostSuggestion.replaceChildren(buildTokenSpans(tokenList, { dim: true }));
+    } else {
+      ghostSuggestion.textContent = completion;
+    }
   } else {
     ghostPrefix.textContent = "";
-    ghostSuggestion.textContent = "";
+    ghostSuggestion.replaceChildren();
   }
 }
 
 function clearSuggestion() {
   currentSuggestion = null;
   ghostPrefix.textContent = "";
-  ghostSuggestion.textContent = "";
+  ghostSuggestion.replaceChildren();
   confidenceNum.textContent = "—";
   meterFill.style.width = "0%";
   meterFill.className = "meter-fill";

@@ -62,11 +62,12 @@ class CodeCompletionModel:
         self.is_loaded = True
 
     @torch.no_grad()
-    def generate(self, prefix: str, max_new_tokens: int = 64) -> tuple[str, float]:
+    def generate(self, prefix: str, max_new_tokens: int = 64):
         """
         Returns:
             completion  : generated text (without the prefix)
             confidence  : exp(mean log-prob) of generated tokens, in (0, 1]
+            tokens      : list of {"text": str, "logprob": float} per generated token
         """
         inputs = self.tokenizer(prefix, return_tensors="pt").to(self.device)
         input_len = inputs["input_ids"].shape[1]
@@ -85,20 +86,22 @@ class CodeCompletionModel:
         generated_ids = outputs.sequences[0][input_len:]
         completion = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
 
-        # ── Confidence: mean log-prob of generated tokens ─────────────────
-        # outputs.scores is a tuple of (vocab_size,) tensors, one per step
+        # ── Per-token text + log-prob (powers the heatmap) ────────────────
+        tokens = []
         log_probs = []
         for step_idx, score_tensor in enumerate(outputs.scores):
             token_id = generated_ids[step_idx].item()
             if token_id == self.tokenizer.eos_token_id:
                 break
             log_prob = torch.log_softmax(score_tensor[0], dim=-1)[token_id].item()
+            token_text = self.tokenizer.decode([token_id], skip_special_tokens=True)
+            tokens.append({"text": token_text, "logprob": log_prob})
             log_probs.append(log_prob)
 
         if not log_probs:
-            return completion, 0.0
+            return completion, 0.0, tokens
 
         mean_log_prob = sum(log_probs) / len(log_probs)
         confidence = math.exp(mean_log_prob)  # maps to (0, 1]
 
-        return completion, confidence
+        return completion, confidence, tokens
