@@ -38,7 +38,7 @@ def health_check():
 def complete(request: CompleteRequest):
     if not model.is_loaded:
         raise HTTPException(status_code=503, detail="Model not loaded yet.")
-    
+        
     try:
         completion, confidence, tokens = model.generate(
             prefix=request.prefix,

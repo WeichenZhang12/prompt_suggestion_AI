@@ -1,0 +1,115 @@
+Metric guide (validation, CodeSearchNet python):
+  - mean_token_accuracy (↑ better)
+  - mean_normalized_edit_distance / NED (↓ better)
+  - exact_match_rate (↑ better)
+  - mean_edit_distance (↓ better)
+  - inline UI rate (↑ = more high-confidence suggestions shown as ghost text)
+
+================================================================================
+What changed between runs (training + eval)
+================================================================================
+
+Run          Base model                  Training (LoRA)                         Eval
+-----------  --------------------------  --------------------------------------  ---------------------------
+preliminary  Qwen2.5-Coder-0.5B          Defaults* → ./checkpoints/lora-adapter  n=100, max_new_tokens=64
+quick        Qwen2.5-Coder-0.5B          * → ./checkpoints/lora-adapter-quick    n=200, max_new_tokens=128
+final        Qwen2.5-Coder-1.5B          See “Final recipe” below                n=200, max_new_tokens=128
+                                         → ./checkpoints/lora-adapter
+
+* Preliminary / quick training used train_lora.py defaults unless noted otherwise:
+    max_train_samples: all train split (no cap)
+    num_epochs: 1
+    batch_size: 2, grad_accum: 8  (effective batch 16)
+    max_length: 1024
+    lora_r: 16, lora_alpha: 32, lora_dropout: 0.05
+    lr: 2e-4, language: python, seed: 42
+
+Final recipe (changed from preliminary — main upgrade):
+    BASE_MODEL_NAME:     Qwen/Qwen2.5-Coder-1.5B   (was 0.5B)
+    max_train_samples:   12000
+    num_epochs:          2                         (was 1)
+    batch_size:          4                         (was 2)
+    grad_accum:          4                         (was 8; effective batch still 16)
+    max_length:          512                       (was 1024)
+    lora_r / lora_alpha: 32 / 64                   (was 16 / 32)
+    --no_eval during training
+    adapter output:      ./checkpoints/lora-adapter
+
+Quick vs preliminary (eval only on same 0.5B family):
+    max_samples:         100 → 200
+    max_new_tokens:      64 → 128
+    separate adapter dir: lora-adapter-quick (quick) vs lora-adapter (prelim/final)
+
+================================================================================
+All runs — quality (base model)
+================================================================================
+
+run          n    token_acc   NED       exact_match   edit_dist   conf_mean   inline%
+preliminary  100  0.043595    0.716072  0.000000      581.400     0.656687    10.0
+quick        200  0.060385    0.691128  0.000000      631.560     0.698941    18.0
+final        200  0.090828    0.672535  0.000000      626.180     0.752560    31.5
+
+→ Final base (1.5B + longer eval) roughly doubles token accuracy vs preliminary 0.5B.
+
+================================================================================
+All runs — quality (LoRA)
+================================================================================
+
+run          n    token_acc   NED       exact_match   edit_dist   conf_mean   inline%
+preliminary  100  0.045748    0.700644  0.000000      569.000     0.665767    10.0
+quick        200  0.057326    0.676821  0.000000      591.750     0.711532    19.5
+final        200  0.082530    0.651069  0.005000      591.005     0.765973    39.5
+
+================================================================================
+Within each run: LoRA vs base (delta = LoRA − base)
+================================================================================
+
+--- preliminary (n=100) ---
+  token_acc:      +0.002153  (LoRA slightly higher)
+  NED:            -0.015428  (LoRA better)
+  exact_match:    tie (0%)
+  edit_distance:  -12.4      (LoRA better)
+  conf_mean:      +0.009080
+  inline rate:    +0.0       (both 10%)
+
+--- quick (n=200, adapter-quick) ---
+  token_acc:      -0.003059  (base slightly higher)
+  NED:            -0.014307  (LoRA better)
+  exact_match:    tie (0%)
+  edit_distance:  -39.81     (LoRA better)
+  conf_mean:      +0.012591
+  inline rate:    +1.5 pp
+
+--- final (n=200, adapter lora-adapter) ---
+  token_acc:      -0.008298  (base slightly higher)
+  NED:            -0.021467  (LoRA better)
+  exact_match:    +0.5 pp    (1/200 with LoRA)
+  edit_distance:  -35.175    (LoRA better)
+  conf_mean:      +0.013413
+  inline rate:    +8.0 pp    (31.5% → 39.5%)
+
+Takeaway: LoRA gives modest gains on closeness-to-gold (NED, edit distance) and UI
+inline rate; largest jump is preliminary → final from model size + training recipe.
+
+================================================================================
+Latency (mean ms, from JSON)
+================================================================================
+
+run          base      LoRA      notes
+preliminary  4182.5    2455.6    same machine; variance between runs
+quick        2080.8    2574.0
+final        2970.7    3498.4
+
+================================================================================
+Files in results/
+================================================================================
+
+  summary.txt              ← this file (compare runs + param history)
+  prelim_base.json         prelim_base_summary.txt
+  prelim_lora.json         prelim_lora_summary.txt
+  quick_base.json          quick_base_summary.txt
+  quick_lora.json          quick_lora_summary.txt
+  quick_compare.txt        base vs LoRA table for quick run
+  final_base.json          final_base_summary.txt
+  final_lora.json          final_lora_summary.txt
+

@@ -1,0 +1,38 @@
+=== Base vs LoRA (eval_metrics JSON) ===
+Generated (UTC): 2026-05-05T20:02:41+00:00
+
+Base JSON: E:\UIUC\cs568\prompt_suggestion_AI\files (1)\results\quick_base.json
+LoRA JSON: E:\UIUC\cs568\prompt_suggestion_AI\files (1)\results\quick_lora.json
+
+--- Config ---
+n samples:     200  (requested 200)
+split / lang:  validation / python
+max_new_tokens: 128
+base model:    Qwen/Qwen2.5-Coder-0.5B
+lora path (base run): ''
+lora path (lora run): './checkpoints/lora-adapter-quick'
+
+--- Quality (higher token acc / exact match better; lower NED & edit distance better) ---
+metric                                 base          lora         delta  winner
+mean_token_accuracy                0.060385      0.057326     -0.003059  Base
+mean_normalized_edit_distance      0.691128      0.676821     -0.014307  LoRA
+exact_match_rate                   0.000000      0.000000      0.000000  tie
+mean_edit_distance               631.560000    591.750000    -39.810000  LoRA
+
+--- Confidence ---
+mean      base   0.698941  lora   0.711532  diff   0.012591
+median    base   0.711331  lora   0.726648  diff   0.015317
+min       base   0.000000  lora   0.000000  diff   0.000000
+max       base   0.956460  lora   0.966122  diff   0.009662
+
+--- Latency (ms) ---
+mean      base    2080.76  lora    2574.00  diff     493.24
+median    base    2051.45  lora    2452.47  diff     401.03
+min       base      41.51  lora      36.08  diff      -5.43
+max       base    3921.61  lora    4644.77  diff     723.17
+
+--- UI mode rates ---
+collapsed   base   0.810000  lora   0.785000  diff  -0.025000
+hidden      base   0.010000  lora   0.020000  diff   0.010000
+inline      base   0.180000  lora   0.195000  diff   0.015000
+

@@ -1,0 +1,77 @@
+{
+  "config": {
+    "base_model_name": "Qwen/Qwen2.5-Coder-1.5B",
+    "lora_adapter_path": "./checkpoints/lora-adapter",
+    "language": "python",
+    "split": "validation",
+    "max_samples_requested": 200,
+    "max_samples_used": 200,
+    "max_new_tokens": 128
+  },
+  "quality": {
+    "n": 200,
+    "mean_token_accuracy": 0.08253038919821867,
+    "mean_normalized_edit_distance": 0.6510686751141173,
+    "exact_match_rate": 0.005,
+    "mean_edit_distance": 591.005
+  },
+  "confidence": {
+    "mean": 0.7659726390488466,
+    "median": 0.7746267869270752,
+    "min": 0.3440088861141579,
+    "max": 0.9618645997679606
+  },
+  "latency_ms": {
+    "mean": 3498.4190134994424,
+    "median": 3681.250249999721,
+    "min": 236.45359999500215,
+    "max": 6376.188100002764
+  },
+  "ui_mode_counts": {
+    "inline": 79,
+    "collapsed": 119,
+    "hidden": 2
+  },
+  "ui_mode_rates": {
+    "inline": 0.395,
+    "collapsed": 0.595,
+    "hidden": 0.01
+  },
+  "examples": [
+    {
+      "idx": 0,
+      "confidence": 0.801,
+      "ui_mode": "inline",
+      "pred_suffix_preview": "<|fim_suffix|>\n            obs = new_obs\n            reset = False\n\n            if t % print_freq == 0:\n                mean_reward, std_reward = episode_reward",
+      "gold_suffix_preview": "   kwargs['update_param_noise_scale'] = True\n            action = act(np.array(obs)[None], update_eps=update_eps, **kwargs)[0]\n            env_action = action\n "
+    },
+    {
+      "idx": 1,
+      "confidence": 0.8175,
+      "ui_mode": "inline",
+      "pred_suffix_preview": "cory() as tmp:\n            tmp_path = os.path.join(tmp, \"model.pkl\")\n            self.save(tmp_path)\n            shutil.copyfile(tmp_path, path)",
+      "gold_suffix_preview": "ctory() as td:\n            save_variables(os.path.join(td, \"model\"))\n            arc_name = os.path.join(td, \"packed.zip\")\n            with zipfile.ZipFile(arc_"
+    },
+    {
+      "idx": 2,
+      "confidence": 0.9474,
+      "ui_mode": "inline",
+      "pred_suffix_preview": " 'c2', nf=64, rf=4, stride=2, init_scale=np.sqrt(2), **conv_kwargs))\n    h3 = activ(conv(h2, 'c3', nf=64, rf=3, stride=1, init_scale=np.sqrt(2), **conv_kwargs))",
+      "gold_suffix_preview": "'c2', nf=64, rf=4, stride=2, init_scale=np.sqrt(2), **conv_kwargs))\n    h3 = activ(conv(h2, 'c3', nf=64, rf=3, stride=1, init_scale=np.sqrt(2), **conv_kwargs))\n"
+    },
+    {
+      "idx": 3,
+      "confidence": 0.6165,
+      "ui_mode": "collapsed",
+      "pred_suffix_preview": " * A list of num_layers dense layers\n    \"\"\"\n    def layer_fn(input_var, name):\n        return tf.layers.dense(input_var, num_hidden, activation=activation, nam",
+      "gold_suffix_preview": "-------\n\n    function that builds fully connected network with a given input tensor / placeholder\n    \"\"\"\n    def network_fn(X):\n        h = tf.layers.flatten(X"
+    },
+    {
+      "idx": 4,
+      "confidence": 0.654,
+      "ui_mode": "collapsed",
+      "pred_suffix_preview": " after last state was computed)\n        H is LSTM hidden state at current time step\n        C is LSTM cell state at current time step\n        output is a tuple ",
+      "gold_suffix_preview": "after the end of the episode, but can be used for other purposes too)\n        initial_state is a numpy array containing initial lstm state (usually zeros)\n     "
+    }
+  ]
+}

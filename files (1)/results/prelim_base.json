@@ -1,0 +1,77 @@
+{
+  "config": {
+    "base_model_name": "Qwen/Qwen2.5-Coder-0.5B",
+    "lora_adapter_path": "",
+    "language": "python",
+    "split": "validation",
+    "max_samples_requested": 100,
+    "max_samples_used": 100,
+    "max_new_tokens": 64
+  },
+  "quality": {
+    "n": 100,
+    "mean_token_accuracy": 0.04359536947722367,
+    "mean_normalized_edit_distance": 0.7160715741674046,
+    "exact_match_rate": 0.0,
+    "mean_edit_distance": 581.4
+  },
+  "confidence": {
+    "mean": 0.656686732382025,
+    "median": 0.6655371841298277,
+    "min": 0.4002144778195336,
+    "max": 0.9511555306091365
+  },
+  "latency_ms": {
+    "mean": 4182.501380740001,
+    "median": 4408.356562500017,
+    "min": 718.872417,
+    "max": 9200.614791000002
+  },
+  "ui_mode_counts": {
+    "inline": 10,
+    "collapsed": 90,
+    "hidden": 0
+  },
+  "ui_mode_rates": {
+    "inline": 0.1,
+    "collapsed": 0.9,
+    "hidden": 0.0
+  },
+  "examples": [
+    {
+      "idx": 0,
+      "confidence": 0.6065,
+      "ui_mode": "collapsed",
+      "pred_suffix_preview": " # Update the parameters\n            act.update_params(update_eps, **kwargs)\n            # Take action and update the replay buffer\n            obs, reward, don",
+      "gold_suffix_preview": "   kwargs['update_param_noise_scale'] = True\n            action = act(np.array(obs)[None], update_eps=update_eps, **kwargs)[0]\n            env_action = action\n "
+    },
+    {
+      "idx": 1,
+      "confidence": 0.6755,
+      "ui_mode": "collapsed",
+      "pred_suffix_preview": "cory() as tmp:\n            with open(path, \"wb\") as f:\n                pickle.dump(self, f)\n\n        logger.info(\"Model saved to %s\", path)",
+      "gold_suffix_preview": "ctory() as td:\n            save_variables(os.path.join(td, \"model\"))\n            arc_name = os.path.join(td, \"packed.zip\")\n            with zipfile.ZipFile(arc_"
+    },
+    {
+      "idx": 2,
+      "confidence": 0.925,
+      "ui_mode": "inline",
+      "pred_suffix_preview": " 'c2', nf=64, rf=4, stride=2, init_scale=np.sqrt(2),\n                   **conv_kwargs))\n    h3 = activ(conv(h2, 'c3', nf=128, rf=3, stride=2, init_scale=np.sqrt",
+      "gold_suffix_preview": "'c2', nf=64, rf=4, stride=2, init_scale=np.sqrt(2), **conv_kwargs))\n    h3 = activ(conv(h2, 'c3', nf=64, rf=3, stride=1, init_scale=np.sqrt(2), **conv_kwargs))\n"
+    },
+    {
+      "idx": 3,
+      "confidence": 0.4408,
+      "ui_mode": "collapsed",
+      "pred_suffix_preview": " -------\n     A function that takes in a tensor of shape (batch_size, input_dim) and returns a tensor of shape (batch_size, output_dim)\n    \"\"\"\n    def mlp_fn(x",
+      "gold_suffix_preview": "-------\n\n    function that builds fully connected network with a given input tensor / placeholder\n    \"\"\"\n    def network_fn(X):\n        h = tf.layers.flatten(X"
+    },
+    {
+      "idx": 4,
+      "confidence": 0.5937,
+      "ui_mode": "collapsed",
+      "pred_suffix_preview": "0)\n        H is a placeholder for the hidden state of the LSTM\n        C is a placeholder for the cell state of the LSTM\n        W is a placeholder for the weig",
+      "gold_suffix_preview": "after the end of the episode, but can be used for other purposes too)\n        initial_state is a numpy array containing initial lstm state (usually zeros)\n     "
+    }
+  ]
+}

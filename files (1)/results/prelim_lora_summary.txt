@@ -1,0 +1,23 @@
+=== Preliminary Results (LoRA) ===
+n = 100
+mean_token_accuracy = 0.045748
+mean_normalized_edit_distance = 0.700644
+exact_match_rate = 0.000000
+mean_edit_distance = 569.000
+
+Confidence:
+  mean: 0.665767
+  median: 0.660949
+  min: 0.371588
+  max: 0.941095
+
+Latency (ms):
+  mean: 2455.604
+  median: 2653.533
+  min: 316.143
+  max: 3916.917
+
+UI mode rates:
+  inline: 0.100000
+  collapsed: 0.890000
+  hidden: 0.010000

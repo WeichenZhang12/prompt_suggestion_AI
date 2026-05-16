@@ -1,0 +1,23 @@
+=== Results (Quick — Base) ===
+n = 200
+mean_token_accuracy = 0.060385
+mean_normalized_edit_distance = 0.691128
+exact_match_rate = 0.000000
+mean_edit_distance = 631.560
+
+Confidence:
+  mean: 0.698941
+  median: 0.711331
+  min: 0.000000
+  max: 0.956460
+
+Latency (ms):
+  mean: 2080.758
+  median: 2051.446
+  min: 41.508
+  max: 3921.605
+
+UI mode rates:
+  inline: 0.180000
+  collapsed: 0.810000
+  hidden: 0.010000

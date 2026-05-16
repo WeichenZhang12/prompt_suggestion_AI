@@ -1,0 +1,42 @@
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# --- Environments ---
+.venv/
+venv/
+env/
+
+# --- Secrets ---
+.env
+.env.*
+
+# --- ML / HF caches (large) ---
+.cache/
+*.pt.bak
+
+# --- Project: generated / huge (keep scripts & docs you add explicitly) ---
+files (1)/checkpoints/
+files (1)/backend/logs/
+files (1)/.venv/
+
+# Eval artifacts — keep summaries and JSON for comparison (see results/summary.txt)
+files (1)/results/*
+!files (1)/results/summary.txt
+!files (1)/results/*_summary.txt
+!files (1)/results/*.json
+!files (1)/results/quick_compare.txt
