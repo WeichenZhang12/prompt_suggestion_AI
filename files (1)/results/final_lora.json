@@ -6,7 +6,9 @@
     "split": "validation",
     "max_samples_requested": 200,
     "max_samples_used": 200,
-    "max_new_tokens": 128
+    "max_new_tokens": 128,
+    "confidence_threshold_high": 0.78,
+    "confidence_threshold_low": 0.7
   },
   "quality": {
     "n": 200,
@@ -22,20 +24,20 @@
     "max": 0.9618645997679606
   },
   "latency_ms": {
-    "mean": 3498.4190134994424,
-    "median": 3681.250249999721,
-    "min": 236.45359999500215,
-    "max": 6376.188100002764
+    "mean": 3646.4231194998497,
+    "median": 3801.503850001609,
+    "min": 253.74569999985397,
+    "max": 7002.082599996356
   },
   "ui_mode_counts": {
-    "inline": 79,
-    "collapsed": 119,
-    "hidden": 2
+    "inline": 96,
+    "collapsed": 51,
+    "hidden": 53
   },
   "ui_mode_rates": {
-    "inline": 0.395,
-    "collapsed": 0.595,
-    "hidden": 0.01
+    "inline": 0.48,
+    "collapsed": 0.255,
+    "hidden": 0.265
   },
   "examples": [
     {
@@ -62,14 +64,14 @@
     {
       "idx": 3,
       "confidence": 0.6165,
-      "ui_mode": "collapsed",
+      "ui_mode": "hidden",
       "pred_suffix_preview": " * A list of num_layers dense layers\n    \"\"\"\n    def layer_fn(input_var, name):\n        return tf.layers.dense(input_var, num_hidden, activation=activation, nam",
       "gold_suffix_preview": "-------\n\n    function that builds fully connected network with a given input tensor / placeholder\n    \"\"\"\n    def network_fn(X):\n        h = tf.layers.flatten(X"
     },
     {
       "idx": 4,
       "confidence": 0.654,
-      "ui_mode": "collapsed",
+      "ui_mode": "hidden",
       "pred_suffix_preview": " after last state was computed)\n        H is LSTM hidden state at current time step\n        C is LSTM cell state at current time step\n        output is a tuple ",
       "gold_suffix_preview": "after the end of the episode, but can be used for other purposes too)\n        initial_state is a numpy array containing initial lstm state (usually zeros)\n     "
     }

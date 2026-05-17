@@ -12,12 +12,12 @@ Confidence:
   max: 0.975919
 
 Latency (ms):
-  mean: 2970.746
-  median: 3494.861
-  min: 255.016
-  max: 4663.323
+  mean: 2649.939
+  median: 2897.844
+  min: 257.361
+  max: 5194.224
 
 UI mode rates:
-  inline: 0.315000
-  collapsed: 0.685000
-  hidden: 0.000000
+  inline: 0.415000
+  collapsed: 0.270000
+  hidden: 0.315000

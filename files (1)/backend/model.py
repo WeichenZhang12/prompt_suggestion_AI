@@ -102,6 +102,6 @@ class CodeCompletionModel:
             return completion, 0.0, tokens
 
         mean_log_prob = sum(log_probs) / len(log_probs)
-        confidence = math.exp(mean_log_prob)  # maps to (0, 1]
+        confidence = math.exp(mean_log_prob)
 
         return completion, confidence, tokens

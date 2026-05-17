@@ -38,9 +38,9 @@ uvicorn main:app --reload --port 8000
 `ui_mode` values:
 | Value | Confidence | Frontend behavior |
 |-------|-----------|-------------------|
-| `inline` | ≥ 0.80 | Show as ghost text |
-| `collapsed` | 0.40 – 0.79 | Show in expandable panel |
-| `hidden` | < 0.40 | Suppress entirely |
+| `inline` | ≥ 0.78 | Show as ghost text |
+| `collapsed` | 0.70 – 0.77 | Show in expandable panel |
+| `hidden` | < 0.70 | Suppress entirely |
 
 ### `GET /health`
 Returns `{ "status": "ok", "model_loaded": true }`.

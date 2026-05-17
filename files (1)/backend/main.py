@@ -4,6 +4,9 @@ from schemas import CompleteRequest, CompleteResponse
 from model import CodeCompletionModel
 import logging
 
+CONFIDENCE_HIGH = 0.78
+CONFIDENCE_LOW = 0.70
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,7 @@ async def startup_event():
 def health_check():
     return {"status": "ok", "model_loaded": model.is_loaded}
 
+
 @app.post("/api/complete", response_model=CompleteResponse)
 def complete(request: CompleteRequest):
     if not model.is_loaded:
@@ -48,13 +52,12 @@ def complete(request: CompleteRequest):
         logger.error(f"Inference error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Determine UI tier based on confidence
-    if confidence >= 0.80:
-        ui_mode = "inline"       # ghost text
-    elif confidence >= 0.40:
-        ui_mode = "collapsed"    # expandable panel
+    if confidence >= CONFIDENCE_HIGH:
+        ui_mode = "inline"
+    elif confidence >= CONFIDENCE_LOW:
+        ui_mode = "collapsed"
     else:
-        ui_mode = "hidden"       # suppressed
+        ui_mode = "hidden"
 
     return CompleteResponse(
         completion=completion,

@@ -14,11 +14,14 @@ from data import build_prompt_completion_dataset  # noqa: E402
 from metrics import aggregate_metrics, evaluate_completion  # noqa: E402
 from model import CodeCompletionModel  # noqa: E402
 
+CONFIDENCE_HIGH = 0.78
+CONFIDENCE_LOW = 0.70
+
 
 def _ui_mode(confidence: float) -> str:
-    if confidence >= 0.80:
+    if confidence >= CONFIDENCE_HIGH:
         return "inline"
-    if confidence >= 0.40:
+    if confidence >= CONFIDENCE_LOW:
         return "collapsed"
     return "hidden"
 
@@ -99,6 +102,8 @@ def main() -> None:
             "max_samples_requested": args.max_samples,
             "max_samples_used": n,
             "max_new_tokens": args.max_new_tokens,
+            "confidence_threshold_high": CONFIDENCE_HIGH,
+            "confidence_threshold_low": CONFIDENCE_LOW,
         },
         "quality": quality,
         "confidence": {

@@ -24,9 +24,9 @@ class CompleteResponse(BaseModel):
     ui_mode: Literal["inline", "collapsed", "hidden"] = Field(
         ...,
         description=(
-            "inline    → show as ghost text (confidence ≥ 0.80)\n"
-            "collapsed → show in expandable panel (0.40 ≤ confidence < 0.80)\n"
-            "hidden    → suppress entirely (confidence < 0.40)"
+            "inline    → show as ghost text (confidence ≥ 0.78)\n"
+            "collapsed → show in expandable panel (0.70 ≤ confidence < 0.78)\n"
+            "hidden    → suppress entirely (confidence < 0.70)"
         ),
     )
     tokens: List[TokenInfo] = Field(

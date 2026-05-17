@@ -6,7 +6,9 @@
     "split": "validation",
     "max_samples_requested": 200,
     "max_samples_used": 200,
-    "max_new_tokens": 128
+    "max_new_tokens": 128,
+    "confidence_threshold_high": 0.78,
+    "confidence_threshold_low": 0.7
   },
   "quality": {
     "n": 200,
@@ -22,33 +24,33 @@
     "max": 0.9759193887776687
   },
   "latency_ms": {
-    "mean": 2970.7463400003326,
-    "median": 3494.861499999388,
-    "min": 255.01600000279723,
-    "max": 4663.32319999492
+    "mean": 2649.9385855000223,
+    "median": 2897.84415000031,
+    "min": 257.3608000020613,
+    "max": 5194.223799997417
   },
   "ui_mode_counts": {
-    "inline": 63,
-    "collapsed": 137,
-    "hidden": 0
+    "inline": 83,
+    "collapsed": 54,
+    "hidden": 63
   },
   "ui_mode_rates": {
-    "inline": 0.315,
-    "collapsed": 0.685,
-    "hidden": 0.0
+    "inline": 0.415,
+    "collapsed": 0.27,
+    "hidden": 0.315
   },
   "examples": [
     {
       "idx": 0,
       "confidence": 0.6949,
-      "ui_mode": "collapsed",
+      "ui_mode": "hidden",
       "pred_suffix_preview": "<|fim_suffix|>\n            # Update the action counters\n            for key, value in action_counters.items():\n                action_counters[key] = value + 1\n",
       "gold_suffix_preview": "   kwargs['update_param_noise_scale'] = True\n            action = act(np.array(obs)[None], update_eps=update_eps, **kwargs)[0]\n            env_action = action\n "
     },
     {
       "idx": 1,
       "confidence": 0.6834,
-      "ui_mode": "collapsed",
+      "ui_mode": "hidden",
       "pred_suffix_preview": "cory() as d:\n            path = os.path.join(d, \"model.pkl\")\n            self.save(path)\n            shutil.copyfile(path, path)",
       "gold_suffix_preview": "ctory() as td:\n            save_variables(os.path.join(td, \"model\"))\n            arc_name = os.path.join(td, \"packed.zip\")\n            with zipfile.ZipFile(arc_"
     },
@@ -62,14 +64,14 @@
     {
       "idx": 3,
       "confidence": 0.677,
-      "ui_mode": "collapsed",
+      "ui_mode": "hidden",
       "pred_suffix_preview": " ------------------------------\n     network: tf.Tensor             fully-connected network\n    \"\"\"\n    def network(x):\n        for i in range(num_layers):\n    ",
       "gold_suffix_preview": "-------\n\n    function that builds fully connected network with a given input tensor / placeholder\n    \"\"\"\n    def network_fn(X):\n        h = tf.layers.flatten(X"
     },
     {
       "idx": 4,
       "confidence": 0.5482,
-      "ui_mode": "collapsed",
+      "ui_mode": "hidden",
       "pred_suffix_preview": "0 in input)\n        X is a placeholder for the state inputs\n        H is the LSTM hidden state (initially zeros)\n        C is the LSTM cell state (initially zer",
       "gold_suffix_preview": "after the end of the episode, but can be used for other purposes too)\n        initial_state is a numpy array containing initial lstm state (usually zeros)\n     "
     }

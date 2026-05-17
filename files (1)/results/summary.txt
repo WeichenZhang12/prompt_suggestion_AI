@@ -3,7 +3,11 @@ Metric guide (validation, CodeSearchNet python):
   - mean_normalized_edit_distance / NED (↓ better)
   - exact_match_rate (↑ better)
   - mean_edit_distance (↓ better)
-  - inline UI rate (↑ = more high-confidence suggestions shown as ghost text)
+  - UI tiers: inline (high conf), collapsed (medium), hidden (low)
+
+UI thresholds (backend + eval + frontend defaults):
+  - Current final eval: high = 0.78 (inline), low = 0.70 (collapsed vs hidden)
+  - Earlier final eval used 0.80 / 0.40 (almost no hidden tier)
 
 ================================================================================
 What changed between runs (training + eval)
@@ -47,9 +51,10 @@ All runs — quality (base model)
 run          n    token_acc   NED       exact_match   edit_dist   conf_mean   inline%
 preliminary  100  0.043595    0.716072  0.000000      581.400     0.656687    10.0
 quick        200  0.060385    0.691128  0.000000      631.560     0.698941    18.0
-final        200  0.090828    0.672535  0.000000      626.180     0.752560    31.5
+final        200  0.090828    0.672535  0.000000      626.180     0.752560    41.5
 
 → Final base (1.5B + longer eval) roughly doubles token accuracy vs preliminary 0.5B.
+→ final inline% uses thresholds 0.78 / 0.70 (see UI section below).
 
 ================================================================================
 All runs — quality (LoRA)
@@ -58,7 +63,23 @@ All runs — quality (LoRA)
 run          n    token_acc   NED       exact_match   edit_dist   conf_mean   inline%
 preliminary  100  0.045748    0.700644  0.000000      569.000     0.665767    10.0
 quick        200  0.057326    0.676821  0.000000      591.750     0.711532    19.5
-final        200  0.082530    0.651069  0.005000      591.005     0.765973    39.5
+final        200  0.082530    0.651069  0.005000      591.005     0.765973    48.0
+
+================================================================================
+Final run — UI mode distribution (thresholds 0.78 / 0.70)
+================================================================================
+
+              inline      collapsed     hidden
+Base          41.5% (83)  27.0% (54)    31.5% (63)
+LoRA          48.0% (96)  25.5% (51)    26.5% (53)
+
+Same run with old thresholds 0.80 / 0.40 (for comparison):
+              inline      collapsed     hidden
+Base          31.5% (63)  68.5% (137)   0.0% (0)
+LoRA          39.5% (79)  59.5% (119)   1.0% (2)
+
+Quality metrics (token_acc, NED, edit distance) are unchanged between the two
+threshold settings; only tier assignment changes.
 
 ================================================================================
 Within each run: LoRA vs base (delta = LoRA − base)
@@ -80,16 +101,19 @@ Within each run: LoRA vs base (delta = LoRA − base)
   conf_mean:      +0.012591
   inline rate:    +1.5 pp
 
---- final (n=200, adapter lora-adapter) ---
+--- final (n=200, thresholds 0.78/0.70, adapter lora-adapter) ---
   token_acc:      -0.008298  (base slightly higher)
   NED:            -0.021467  (LoRA better)
   exact_match:    +0.5 pp    (1/200 with LoRA)
   edit_distance:  -35.175    (LoRA better)
   conf_mean:      +0.013413
-  inline rate:    +8.0 pp    (31.5% → 39.5%)
+  inline rate:    +6.5 pp    (41.5% → 48.0%)
+  collapsed:      -1.5 pp
+  hidden:         -5.0 pp    (31.5% → 26.5%)
 
 Takeaway: LoRA gives modest gains on closeness-to-gold (NED, edit distance) and UI
 inline rate; largest jump is preliminary → final from model size + training recipe.
+LoRA vs base remains mixed on token accuracy.
 
 ================================================================================
 Latency (mean ms, from JSON)
@@ -98,7 +122,7 @@ Latency (mean ms, from JSON)
 run          base      LoRA      notes
 preliminary  4182.5    2455.6    same machine; variance between runs
 quick        2080.8    2574.0
-final        2970.7    3498.4
+final        2650.0    3646.4    latest re-eval with 0.78/0.70 thresholds
 
 ================================================================================
 Files in results/
@@ -110,6 +134,6 @@ Files in results/
   quick_base.json          quick_base_summary.txt
   quick_lora.json          quick_lora_summary.txt
   quick_compare.txt        base vs LoRA table for quick run
-  final_base.json          final_base_summary.txt
+  final_base.json          final_base_summary.txt  (config: high=0.78, low=0.7)
   final_lora.json          final_lora_summary.txt
 

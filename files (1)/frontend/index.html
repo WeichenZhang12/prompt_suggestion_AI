@@ -835,16 +835,16 @@
       <div class="threshold-row">
         <div class="threshold-label">
           <span class="name"><span class="swatch high"></span>Inline (high)</span>
-          <span class="val" id="high-val">0.80</span>
+          <span class="val" id="high-val">0.78</span>
         </div>
-        <input type="range" id="high-slider" min="0" max="100" step="1" value="80">
+        <input type="range" id="high-slider" min="0" max="100" step="1" value="78">
       </div>
       <div class="threshold-row">
         <div class="threshold-label">
           <span class="name"><span class="swatch low"></span>Show (low)</span>
-          <span class="val" id="low-val">0.40</span>
+          <span class="val" id="low-val">0.70</span>
         </div>
-        <input type="range" id="low-slider" min="0" max="100" step="1" value="40">
+        <input type="range" id="low-slider" min="0" max="100" step="1" value="70">
       </div>
     </div>
 
@@ -954,7 +954,8 @@
 const API_BASE      = "http://localhost:8000";
 const STORAGE_KEY   = "promptsuggest.editor.v1";
 const SETTINGS_KEY  = "promptsuggest.settings.v1";
-const THRESHOLD_KEY = "promptsuggest.thresholds.v1";
+const THRESHOLD_KEY = "promptsuggest.thresholds.v2";
+const DEFAULT_THRESHOLDS = { high: 0.78, low: 0.70 };
 const SIDE_WIDTH_KEY= "promptsuggest.sideWidth.v1";
 const CACHE_TTL_MS  = 60_000;
 const CACHE_MAX     = 50;
@@ -1028,7 +1029,7 @@ let inflight       = null;
 let inflightPrefix = null;
 let readyTimer     = null;
 
-let thresholds   = { high: 0.80, low: 0.40 };
+let thresholds   = { ...DEFAULT_THRESHOLDS };
 const responseCache = new Map();
 
 let settings = {
@@ -1052,7 +1053,12 @@ function loadSettings() {
   } catch {}
   try {
     const raw = localStorage.getItem(THRESHOLD_KEY);
-    if (raw) Object.assign(thresholds, JSON.parse(raw));
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (typeof saved.high === "number" && typeof saved.low === "number") {
+        thresholds = { high: saved.high, low: saved.low };
+      }
+    }
   } catch {}
   try {
     const w = parseInt(localStorage.getItem(SIDE_WIDTH_KEY), 10);
